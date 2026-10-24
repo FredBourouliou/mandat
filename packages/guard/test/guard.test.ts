@@ -129,6 +129,30 @@ describe('guard execution', () => {
   });
 });
 
+describe('restore from ledger', () => {
+  it('rebuilds spending, pending approvals and captures from the persisted ledger', async () => {
+    const { rail, created } = fakeRail();
+    const g = new Guard(mandate, rail, () => NOW);
+    await g.submit(prop({ id: 'small', unitPrice: eur(5000) }));
+    await g.submit(prop({ id: 'big', unitPrice: eur(12000) }));
+    const r = Guard.restore(mandate, rail, JSON.parse(JSON.stringify(g.ledger.entries)), () => NOW);
+    expect(r.spent).toEqual(g.spent);
+    expect(r.orders.map(o => o.state)).toEqual(['paid', 'awaiting_approval']);
+    expect((await r.submit(prop({ id: 'small', unitPrice: eur(5000) }))).status).toBe('paid');
+    expect(created).toHaveLength(2);
+    expect((await r.completeApproval('big')).status).toBe('paid');
+    const again = Guard.restore(mandate, rail, r.ledger.entries, () => NOW);
+    expect(again.orders.map(o => o.state)).toEqual(['paid', 'paid']);
+    expect((await again.submit(prop({ id: 'third', unitPrice: eur(4000) }))).status).toBe('denied');
+  });
+
+  it('refuses a ledger that belongs to another mandate', () => {
+    const { rail } = fakeRail();
+    const other = new Guard({ ...mandate, id: 'mdt_2' }, rail, () => NOW);
+    expect(() => Guard.restore(mandate, rail, other.ledger.entries)).toThrow();
+  });
+});
+
 describe('sealed receipt', () => {
   async function sealed() {
     const { rail } = fakeRail();

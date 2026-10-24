@@ -1,6 +1,6 @@
 import { sha256Hex } from './canonical.ts';
 import { evaluate, mandateHash, type Decision, type Mandate, type Money, type Proposal } from './mandate.ts';
-import { Ledger } from './receipt.ts';
+import { Ledger, type LedgerEntry } from './receipt.ts';
 
 /** The payment rail the guard drives. The PayPal implementation lives in ./paypal.ts. */
 export interface PaymentRail {
@@ -48,13 +48,56 @@ export class Guard {
   /** Operations run one at a time, so two concurrent proposals can never both pass the cumulative check. */
   private queue: Promise<unknown> = Promise.resolve();
 
-  constructor(mandate: Mandate, rail: PaymentRail, clock: () => Date = () => new Date()) {
+  constructor(mandate: Mandate, rail: PaymentRail, clock: () => Date = () => new Date(), entries?: LedgerEntry[]) {
     this.mandate = mandate;
     this.rail = rail;
     this.clock = clock;
     this.hash = mandateHash(mandate);
-    this.ledger = new Ledger(this.hash);
-    this.ledger.append('mandate.issued', { mandate, mandateHash: this.hash }, clock());
+    if (!entries) {
+      this.ledger = new Ledger(this.hash);
+      this.ledger.append('mandate.issued', { mandate, mandateHash: this.hash }, clock());
+      return;
+    }
+    this.ledger = new Ledger(this.hash, entries);
+    this.replay(entries);
+  }
+
+  /** Rebuilds a guard from its persisted ledger: the ledger is the only source of truth. */
+  static restore(mandate: Mandate, rail: PaymentRail, entries: LedgerEntry[], clock?: () => Date): Guard {
+    const first = entries[0];
+    if (!first || first.type !== 'mandate.issued' || (first.data as { mandateHash?: string }).mandateHash !== mandateHash(mandate)) {
+      throw new Error('ledger does not belong to this mandate');
+    }
+    return new Guard(mandate, rail, clock, entries);
+  }
+
+  private replay(entries: LedgerEntry[]): void {
+    let proposal: Proposal | undefined;
+    let decision: Decision | undefined;
+    for (const e of entries) {
+      const d = e.data as any;
+      if (e.type === 'proposal.received') proposal = d.proposal;
+      else if (e.type === 'decision') decision = d;
+      else if (e.type === 'order.created' && proposal && decision && decision.kind !== 'deny') {
+        const amount = decision.amount;
+        const outcome: Outcome = d.mode === 'direct'
+          ? { status: 'paid', orderId: d.orderId, captureId: d.captureId, amount }
+          : { status: 'awaiting_approval', orderId: d.orderId, approveUrl: d.approveUrl, amount, reasons: decision.kind === 'needs_approval' ? decision.reasons : [] };
+        this.purchases.set(proposal.id, { proposal, amount, orderId: d.orderId, state: d.mode === 'direct' ? 'paid' : 'awaiting_approval', outcome });
+      } else if (e.type === 'order.captured' && d.status === 'COMPLETED') {
+        const p = this.purchases.get(d.proposalId);
+        if (p) { p.state = 'paid'; p.outcome = { status: 'paid', orderId: p.orderId, captureId: d.captureId, amount: p.amount }; }
+      }
+    }
+  }
+
+  /** Purchases made under this mandate, in order. */
+  get orders(): { proposal: Proposal; amount: Money; orderId: string; state: 'awaiting_approval' | 'paid'; captureId?: string; approveUrl?: string }[] {
+    return [...this.purchases.values()].map(p => ({
+      proposal: p.proposal, amount: p.amount, orderId: p.orderId, state: p.state,
+      captureId: p.outcome.status === 'paid' ? p.outcome.captureId : undefined,
+      approveUrl: p.outcome.status === 'awaiting_approval' ? p.outcome.approveUrl : undefined,
+    }));
   }
 
   /** Spending counts paid purchases and those reserved while awaiting approval. */

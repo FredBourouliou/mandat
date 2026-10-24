@@ -90,6 +90,18 @@ export class PayPalClient {
       await new Promise(res => setTimeout(res, 500 * attempt));
     }
   }
+
+  /** multipart/form-data call used by the dispute endpoints: a JSON "input" part plus an optional file. */
+  async multipart<T = any>(path: string, input: unknown, file?: { name: string; bytes: Uint8Array; type: string }): Promise<T> {
+    const form = new FormData();
+    form.append('input', new Blob([JSON.stringify(input)], { type: 'application/json' }));
+    if (file) form.append('file1', new Blob([file.bytes as BlobPart], { type: file.type }), file.name);
+    const r = await fetch(`${this.baseUrl}${path}`, { method: 'POST', headers: { Authorization: `Bearer ${await this.accessToken()}` }, body: form });
+    const text = await r.text();
+    const json = text ? JSON.parse(text) : {};
+    if (!r.ok) throw new PayPalError(r.status, json, r.headers.get('paypal-debug-id'));
+    return json as T;
+  }
 }
 
 /** PaymentRail backed by PayPal Orders v2. */
