@@ -25,6 +25,8 @@ interface Purchase {
   proposal: Proposal;
   amount: Money;
   orderId: string;
+  /** direct: test card captured by the guard; approval: the buyer paid with their PayPal account. */
+  mode: 'direct' | 'approval';
   state: 'awaiting_approval' | 'paid';
   outcome: Outcome;
 }
@@ -83,7 +85,7 @@ export class Guard {
         const outcome: Outcome = d.mode === 'direct'
           ? { status: 'paid', orderId: d.orderId, captureId: d.captureId, amount }
           : { status: 'awaiting_approval', orderId: d.orderId, approveUrl: d.approveUrl, amount, reasons: decision.kind === 'needs_approval' ? decision.reasons : [] };
-        this.purchases.set(proposal.id, { proposal, amount, orderId: d.orderId, state: d.mode === 'direct' ? 'paid' : 'awaiting_approval', outcome });
+        this.purchases.set(proposal.id, { proposal, amount, orderId: d.orderId, mode: d.mode === 'direct' ? 'direct' : 'approval', state: d.mode === 'direct' ? 'paid' : 'awaiting_approval', outcome });
       } else if (e.type === 'order.captured' && d.status === 'COMPLETED') {
         const p = this.purchases.get(d.proposalId);
         if (p) { p.state = 'paid'; p.outcome = { status: 'paid', orderId: p.orderId, captureId: d.captureId, amount: p.amount }; }
@@ -92,9 +94,9 @@ export class Guard {
   }
 
   /** Purchases made under this mandate, in order. */
-  get orders(): { proposal: Proposal; amount: Money; orderId: string; state: 'awaiting_approval' | 'paid'; captureId?: string; approveUrl?: string }[] {
+  get orders(): { proposal: Proposal; amount: Money; orderId: string; mode: 'direct' | 'approval'; state: 'awaiting_approval' | 'paid'; captureId?: string; approveUrl?: string }[] {
     return [...this.purchases.values()].map(p => ({
-      proposal: p.proposal, amount: p.amount, orderId: p.orderId, state: p.state,
+      proposal: p.proposal, amount: p.amount, orderId: p.orderId, mode: p.mode, state: p.state,
       captureId: p.outcome.status === 'paid' ? p.outcome.captureId : undefined,
       approveUrl: p.outcome.status === 'awaiting_approval' ? p.outcome.approveUrl : undefined,
     }));
@@ -157,7 +159,7 @@ export class Guard {
     } else {
       return { status: 'failed', orderId: order.orderId, reason: 'no approval link returned' };
     }
-    this.purchases.set(proposal.id, { proposal, amount: decision.amount, orderId: order.orderId, state: mode === 'direct' ? 'paid' : 'awaiting_approval', outcome });
+    this.purchases.set(proposal.id, { proposal, amount: decision.amount, orderId: order.orderId, mode, state: mode === 'direct' ? 'paid' : 'awaiting_approval', outcome });
     return outcome;
   }
 

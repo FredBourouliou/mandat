@@ -123,7 +123,7 @@ export function MerchantView({ id }: { id: string }) {
                   <span>{o.proposal.title} ×{o.proposal.quantity} · <strong>{money(o.amount)}</strong></span>
                   <span className="faint">PayPal order <code>{o.orderId}</code> · custom_id <code title={s.mandateHash}>{short(s.mandateHash, 12)}</code>{t ? ` · ${t.carrier} ${t.trackingNumber}` : ''}</span>
                 </span>
-                {disputed ? <span className="verdict verdict-pending">Disputed</span> : s.live && (
+                {disputed ? <span className="verdict verdict-pending">Disputed</span> : o.mode !== 'direct' ? <span className="faint">Paid with PayPal</span> : s.live && (
                   <button className="btn btn-quiet" disabled={Boolean(busy)} onClick={async () => {
                     setBusy(o.orderId); setErr('');
                     try { await post(`/api/sessions/${id}/disputes`, { orderId: o.orderId }); } catch (e) { setErr((e as Error).message); }

@@ -38,6 +38,8 @@ export async function openDispute(sessionId: string, orderId: string): Promise<s
   const guard = guardFor(sessionId);
   const order = guard?.orders.find(o => o.orderId === orderId && o.state === 'paid' && o.captureId);
   if (!order?.captureId) throw new Error('order is not paid');
+  // A chargeback comes from a card issuer: PayPal refuses it on an order paid from a PayPal account.
+  if (order.mode !== 'direct') throw new Error('Chargebacks apply to card payments; this order was paid from a PayPal account.');
   const existing = db().prepare('SELECT id FROM disputes WHERE order_id = ?').get(orderId) as { id: string } | undefined;
   if (existing) return existing.id;
   const id = await simulateChargeback(paypal(), order.captureId, order.amount);
