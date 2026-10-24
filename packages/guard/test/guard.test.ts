@@ -96,6 +96,15 @@ describe('guard execution', () => {
     expect(g.spent.total.minor).toBe(19000);
   });
 
+  it('keeps the cumulative limit when proposals arrive concurrently', async () => {
+    const { rail, created } = fakeRail();
+    const g = new Guard(mandate, rail, () => NOW);
+    const results = await Promise.all(['c1', 'c2', 'c3'].map(id => g.submit(prop({ id, unitPrice: eur(7500) }))));
+    expect(results.map(r => r.status)).toEqual(['paid', 'paid', 'denied']);
+    expect(created).toHaveLength(2);
+    expect(g.spent.total.minor).toBe(15000);
+  });
+
   it('captures only after human approval, and only once', async () => {
     const { rail } = fakeRail();
     const g = new Guard(mandate, rail, () => NOW);

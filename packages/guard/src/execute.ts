@@ -45,6 +45,8 @@ export class Guard {
   private readonly rail: PaymentRail;
   private readonly clock: () => Date;
   private readonly purchases = new Map<string, Purchase>();
+  /** Operations run one at a time, so two concurrent proposals can never both pass the cumulative check. */
+  private queue: Promise<unknown> = Promise.resolve();
 
   constructor(mandate: Mandate, rail: PaymentRail, clock: () => Date = () => new Date()) {
     this.mandate = mandate;
@@ -62,7 +64,22 @@ export class Guard {
     return { count: this.purchases.size, total: { currency: this.mandate.maxTotal.currency, minor } };
   }
 
-  async submit(proposal: Proposal): Promise<Outcome> {
+  submit(proposal: Proposal): Promise<Outcome> {
+    return this.exclusive(() => this.submitNow(proposal));
+  }
+
+  /** Called when the human comes back from the PayPal approval page. */
+  completeApproval(proposalId: string): Promise<Outcome> {
+    return this.exclusive(() => this.completeApprovalNow(proposalId));
+  }
+
+  private exclusive<T>(fn: () => Promise<T>): Promise<T> {
+    const run = this.queue.then(fn, fn);
+    this.queue = run.catch(() => undefined);
+    return run;
+  }
+
+  private async submitNow(proposal: Proposal): Promise<Outcome> {
     const existing = this.purchases.get(proposal.id);
     if (existing) return existing.outcome;
 
@@ -101,8 +118,7 @@ export class Guard {
     return outcome;
   }
 
-  /** Called when the human comes back from the PayPal approval page. */
-  async completeApproval(proposalId: string): Promise<Outcome> {
+  private async completeApprovalNow(proposalId: string): Promise<Outcome> {
     const p = this.purchases.get(proposalId);
     if (!p) return { status: 'failed', reason: 'unknown proposal' };
     if (p.state === 'paid') return p.outcome;
