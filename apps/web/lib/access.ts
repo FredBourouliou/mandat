@@ -22,10 +22,10 @@ export function checkCode(code: string): string | null {
 }
 
 /**
- * Client IP for rate limits. Cloudflare (in front of Render) overwrites CF-Connecting-IP; otherwise the right-most
- * X-Forwarded-For hop is the one our proxy added, earlier hops are client-controlled. Global caps back this up.
+ * Client IP for rate limits: the right-most X-Forwarded-For hop, added by Render's proxy. Earlier hops and
+ * CF-Connecting-IP pass through as the client sent them (tested on the deployment, 24/10/2026).
  */
 export async function clientIp(): Promise<string> {
   const h = await headers();
-  return h.get('cf-connecting-ip')?.trim() || h.get('x-forwarded-for')?.split(',').at(-1)?.trim() || 'local';
+  return h.get('x-forwarded-for')?.split(',').at(-1)?.trim() || 'local';
 }
