@@ -11,6 +11,8 @@
   "dependencies": {
     "@ai-sdk/anthropic": "4.0.78",
     "@mandat/guard": "workspace:*",
+    "ag-grid-community": "36.2.0",
+    "ag-grid-react": "36.2.0",
     "ai": "7.0.137",
     "better-sqlite3": "13.0.3",
     "next": "16.4.2",

@@ -227,3 +227,18 @@ p.notice { display: block; }
 }
 .ex-injection { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--seal); border-block: 1px dashed var(--seal); padding-block: var(--space-xs); display: grid; gap: 2px; margin-top: var(--space-2xs); }
 .ex-injection .ex-label { font-family: var(--font-body); color: var(--seal); }
+
+/* AG Grid inside the page */
+.grid-wrap { width: 100%; }
+.grid-wrap code { font-size: 0.85em; }
+.grid-wrap .num { font-variant-numeric: tabular-nums; font-weight: 600; }
+.grid-wrap .faint-cell { color: var(--ink-soft); line-height: 1.45; padding-block: var(--space-xs); }
+.grid-wrap .mono-cell { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--ink-faint); }
+.btn-cell { min-height: 34px; padding: 0 var(--space-sm); font-size: var(--text-xs); }
+.grid-search { max-width: 420px; font-weight: 600; }
+.grid-wrap .ag-cell { display: flex; align-items: center; }
+.grid-wrap .ag-cell-wrapper, .grid-wrap .ag-cell-value { line-height: 1.45; }
+.grid-wrap .verdict { line-height: 1.5; }
+.grid-wrap .cell-stack { display: grid; gap: 2px; justify-items: start; }
+.grid-wrap .ag-layout-auto-height .ag-center-cols-viewport,
+.grid-wrap .ag-layout-auto-height .ag-center-cols-container { min-height: 0 !important; }

@@ -4,8 +4,9 @@ import { useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import type { SessionState } from '@/lib/state';
 import { findProduct } from '@/lib/catalog';
-import { describeEntry, money, short, time } from './format';
+import { money, short, time } from './format';
 import { post, useSession } from './use-session';
+import { LedgerGrid } from './grids';
 
 const SCENARIOS = [
   { label: 'Small items for the hike', task: 'I need a headlamp and an insulated water bottle for the hike.' },
@@ -44,30 +45,6 @@ export function MandateTerms({ s }: { s: SessionState }) {
       </p>
       <p className="faint">Mandate hash <code>{short(s.mandateHash, 16)}</code>, sent to PayPal as each order's <code>custom_id</code>.</p>
     </section>
-  );
-}
-
-export function Ledger({ s }: { s: SessionState }) {
-  return (
-    <ol role="list" className="ledger" aria-label="Sealed ledger">
-      {s.ledger.map(e => {
-        const d = describeEntry(e.type, e.data);
-        return (
-          <li key={e.seq} className="reveal">
-            <span className="seq">#{e.seq}</span>
-            <span className="what">
-              <span>{d.label}</span>
-              {d.detail && <span className="faint">{d.detail}</span>}
-              <span className="hash">{short(e.hash, 24)}</span>
-            </span>
-            <span className="stack" style={{ gap: 'var(--space-2xs)', justifyItems: 'end' }}>
-              {d.verdict && <span className={`verdict verdict-${d.verdict[0]}`}>{d.verdict[1]}</span>}
-              <time dateTime={e.at}>{time(e.at)}</time>
-            </span>
-          </li>
-        );
-      })}
-    </ol>
   );
 }
 
@@ -262,7 +239,7 @@ export function BuyerView({ id }: { id: string }) {
         </section>
         <details className="ledger-details">
           <summary>Show the {s.ledger.length} sealed ledger entries</summary>
-          <Ledger s={s} />
+          <LedgerGrid s={s} />
         </details>
       </div>
     </div>

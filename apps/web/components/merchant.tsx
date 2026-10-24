@@ -1,10 +1,11 @@
 'use client';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { SessionState } from '@/lib/state';
-import { money, short, time } from './format';
+import { short, time } from './format';
 import { post, useSession } from './use-session';
 import { ReplayBanner } from './buyer';
+import { OrdersGrid } from './grids';
 
 type Dispute = SessionState['disputes'][number];
 
@@ -96,10 +97,14 @@ export function MerchantView({ id }: { id: string }) {
   const { state: s, error, reload } = useSession<SessionState>(id, x => x.disputes.some(d => !d.response));
   const [busy, setBusy] = useState('');
   const [err, setErr] = useState('');
+  const chargeback = useCallback(async (orderId: string) => {
+    setBusy(orderId); setErr('');
+    try { await post(`/api/sessions/${id}/disputes`, { orderId }); } catch (e) { setErr((e as Error).message); }
+    setBusy(''); reload();
+  }, [id, reload]);
   if (error) return <p className="error">{error}</p>;
   if (!s) return <p className="faint">Loading…</p>;
   const paid = s.orders.filter(o => o.state === 'paid');
-  const tracking = (orderId: string) => s.ledger.find(e => e.type === 'shipment.tracked' && (e.data as any).orderId === orderId)?.data as any;
   return (
     <div className="stack-lg">
       <section className="stack narrow">
@@ -108,37 +113,14 @@ export function MerchantView({ id }: { id: string }) {
         <p className="faint"><Link href={`/s/${id}`}>Back to the buyer's view</Link></p>
       </section>
       {!s.live && <ReplayBanner />}
-      {s.disputes.map(d => <DisputeCard key={d.id} d={d} live={s.live} onChange={reload} />)}
-      {!paid.length && <p className="notice">No paid orders yet. Run the agent from <Link href={`/s/${id}`}>the buyer's view</Link> first.</p>}
-      {paid.length > 0 && (
-        <section className="stack">
-        <h2 className="h-sub">Paid orders</h2>
-        <ol role="list" className="ledger" aria-label="Paid orders">
-          {paid.map((o, i) => {
-            const t = tracking(o.orderId);
-            const disputed = s.disputes.some(d => d.orderId === o.orderId);
-            return (
-              <li key={o.orderId}>
-                <span className="seq">#{i + 1}</span>
-                <span className="what">
-                  <span>{o.proposal.title} ×{o.proposal.quantity} · <strong>{money(o.amount)}</strong></span>
-                  <span className="faint">PayPal order <code>{o.orderId}</code> · {o.mode === 'direct' ? 'card' : 'PayPal account'} · custom_id <code>{short(s.mandateHash, 12)}</code>{t ? ` · ${t.carrier} ${t.trackingNumber}` : ''}</span>
-                </span>
-                {disputed ? <span className="verdict verdict-pending">Disputed</span> : o.mode !== 'direct' ? <span className="faint">No chargeback (PayPal account)</span> : s.live && (
-                  <button className="btn btn-quiet" aria-disabled={Boolean(busy)} onClick={async () => {
-                    if (busy) return;
-                    setBusy(o.orderId); setErr('');
-                    try { await post(`/api/sessions/${id}/disputes`, { orderId: o.orderId }); } catch (e) { setErr((e as Error).message); }
-                    setBusy(''); reload();
-                  }}>{busy === o.orderId ? 'Opening…' : 'Simulate a chargeback'}</button>
-                )}
-              </li>
-            );
-          })}
-        </ol>
+      {!paid.length ? <p className="notice">No paid orders yet. Run the agent from <Link href={`/s/${id}`}>the buyer's view</Link> first.</p> : (
+        <section className="stack" aria-labelledby="orders-title">
+          <div className="section-head"><h2 id="orders-title" className="h-sub">Paid orders</h2><span className="faint">{paid.length} order{paid.length === 1 ? '' : 's'} · sortable</span></div>
+          <OrdersGrid s={s} busy={busy} onChargeback={chargeback} />
         </section>
       )}
       {err && <p className="error" role="alert">{err}</p>}
+      {s.disputes.map(d => <DisputeCard key={d.id} d={d} live={s.live} onChange={reload} />)}
     </div>
   );
 }
