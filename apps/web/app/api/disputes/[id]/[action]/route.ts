@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { hasLiveAccess } from '@/lib/access';
 import { consume } from '@/lib/db';
-import { draftResponse, refreshDispute, simulateOutcome, submitResponse } from '@/lib/disputes';
+import { draftResponse, knownDispute, refreshDispute, simulateOutcome, submitResponse } from '@/lib/disputes';
 
 export const maxDuration = 60;
 
@@ -9,6 +9,7 @@ export const maxDuration = 60;
 export async function POST(_req: Request, ctx: { params: Promise<{ id: string; action: string }> }) {
   const { id, action } = await ctx.params;
   if (!(await hasLiveAccess())) return NextResponse.json({ error: 'An access code is required for live runs.' }, { status: 403 });
+  if (!knownDispute(id)) return NextResponse.json({ error: 'Unknown dispute.' }, { status: 404 });
   try {
     switch (action) {
       case 'refresh': return NextResponse.json({ view: await refreshDispute(id) });

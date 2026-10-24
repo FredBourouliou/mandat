@@ -21,7 +21,11 @@ export function checkCode(code: string): string | null {
   return a.length === b.length && timingSafeEqual(a, b) ? token(JURY_CODE) : null;
 }
 
+/**
+ * Client IP for rate limits. Cloudflare (in front of Render) overwrites CF-Connecting-IP; otherwise the right-most
+ * X-Forwarded-For hop is the one our proxy added, earlier hops are client-controlled. Global caps back this up.
+ */
 export async function clientIp(): Promise<string> {
   const h = await headers();
-  return h.get('x-forwarded-for')?.split(',')[0]?.trim() || 'local';
+  return h.get('cf-connecting-ip')?.trim() || h.get('x-forwarded-for')?.split(',').at(-1)?.trim() || 'local';
 }

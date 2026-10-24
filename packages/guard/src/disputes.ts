@@ -19,7 +19,7 @@ function toMoney(a?: { currency_code: string; value: string }): Money | undefine
 }
 
 export async function getDispute(client: PayPalClient, id: string): Promise<DisputeView> {
-  const d = await client.request('GET', `/v1/customer/disputes/${id}`);
+  const d = await client.request('GET', `/v1/customer/disputes/${encodeURIComponent(id)}`);
   return {
     id: d.dispute_id,
     status: d.status,
@@ -70,13 +70,13 @@ export async function respondToDispute(client: PayPalClient, dispute: DisputeVie
     const evidence_info = res.tracking
       ? { tracking_info: [{ carrier_name: 'OTHER', carrier_name_other: res.tracking.carrier, tracking_number: res.tracking.number }] }
       : undefined;
-    await client.multipart(`/v1/customer/disputes/${dispute.id}/provide-evidence`, {
+    await client.multipart(`/v1/customer/disputes/${encodeURIComponent(dispute.id)}/provide-evidence`, {
       evidences: [{ evidence_type: res.tracking ? 'PROOF_OF_FULFILLMENT' : 'OTHER', evidence_info, notes: res.notes }],
     }, file);
     return 'provide_evidence';
   }
   if (dispute.actions.includes('provide_supporting_info')) {
-    await client.multipart(`/v1/customer/disputes/${dispute.id}/provide-supporting-info`, { notes: res.notes }, file);
+    await client.multipart(`/v1/customer/disputes/${encodeURIComponent(dispute.id)}/provide-supporting-info`, { notes: res.notes }, file);
     return 'provide_supporting_info';
   }
   return null;

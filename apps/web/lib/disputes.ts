@@ -20,6 +20,13 @@ export function disputesFor(sessionId: string): DisputeRow[] {
   return db.prepare('SELECT * FROM disputes WHERE session_id = ? ORDER BY created_at').all(sessionId) as DisputeRow[];
 }
 
+const DISPUTE_ID = /^PP-[A-Z0-9-]{4,40}$/;
+
+/** Only disputes this app opened can be acted on. */
+export function knownDispute(id: string): boolean {
+  return DISPUTE_ID.test(id) && Boolean(db.prepare('SELECT 1 FROM disputes WHERE id = ?').get(id));
+}
+
 function dispute(id: string): DisputeRow {
   const row = db.prepare('SELECT * FROM disputes WHERE id = ?').get(id) as DisputeRow | undefined;
   if (!row) throw new Error('unknown dispute');
@@ -41,6 +48,7 @@ export async function openDispute(sessionId: string, orderId: string): Promise<s
 
 /** PayPal indexes new disputes with a delay; until then the dispute reads as pending. */
 export async function refreshDispute(id: string): Promise<DisputeView | null> {
+  if (!knownDispute(id)) return null;
   try {
     const view = await getDispute(paypal(), id);
     db.prepare('UPDATE disputes SET view = ? WHERE id = ?').run(JSON.stringify(view), id);
