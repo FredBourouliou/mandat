@@ -65,7 +65,7 @@ export function OrdersGrid({ s, busy, onChargeback }: { s: SessionState; busy: s
       field: 'dispute', headerName: 'Dispute', width: 196, sortable: false,
       cellRenderer: (p: ICellRendererParams<OrderRow>) => {
         if (p.value) return <Verdict kind={p.value.startsWith('Won') ? 'allow' : 'pending'} label={p.value} />;
-        if (p.data?.mode !== 'direct') return <span className="faint">No chargeback (PayPal account)</span>;
+        if (p.data?.mode !== 'direct') return <span className="faint" title="Paid from a PayPal account: card chargebacks do not apply">No chargeback</span>;
         if (!s.live) return <span className="faint">—</span>;
         return <button className="btn btn-quiet btn-cell" aria-disabled={Boolean(busy)} onClick={() => { if (!busy && p.data) onChargeback(p.data.orderId); }}>{busy === p.data?.orderId ? 'Opening…' : 'Simulate a chargeback'}</button>;
       },
