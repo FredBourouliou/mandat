@@ -1,18 +1,20 @@
 :root {
-  /* Paper and ink, tinted towards the seal hue (oxblood, h=25). */
-  --paper: oklch(97.6% 0.008 75);
-  --paper-sunk: oklch(95% 0.011 70);
-  --rule: oklch(86% 0.012 60);
-  --rule-strong: oklch(70% 0.015 50);
-  --ink: oklch(23% 0.018 40);
-  --ink-soft: oklch(42% 0.016 45);
-  --ink-faint: oklch(52% 0.014 50);
+  /* Security paper (cheques, deeds): pale green-grey, ruled in the same green; ink is blue-black;
+     the seal stays oxblood, like a stamp on a cheque. */
+  --paper: oklch(97.3% 0.011 165);
+  --paper-sunk: oklch(94.8% 0.016 165);
+  --rule: oklch(85.5% 0.02 165);
+  --rule-strong: oklch(67% 0.022 170);
+  --ink: oklch(24% 0.022 235);
+  --ink-soft: oklch(41% 0.02 225);
+  --ink-faint: oklch(49% 0.018 215);
+  --guilloche: oklch(62% 0.05 165);
 
   --seal: oklch(42% 0.13 25);
-  --seal-wash: oklch(94% 0.025 25);
-  --allow: oklch(44% 0.09 150);
-  --allow-wash: oklch(95% 0.025 150);
-  --pending: oklch(50% 0.11 70);
+  --seal-wash: oklch(94.5% 0.022 25);
+  --allow: oklch(42% 0.09 152);
+  --allow-wash: oklch(93.5% 0.035 152);
+  --pending: oklch(49% 0.11 70);
   --pending-wash: oklch(95% 0.035 85);
 
   --space-2xs: 4px;
@@ -50,6 +52,14 @@ body {
 }
 h1, h2, h3 { font-family: var(--font-display), Georgia, serif; font-weight: 600; line-height: 1.15; margin: 0; letter-spacing: -0.01em; }
 h1 { font-size: var(--text-2xl); }
+h1, h2, h3 { text-wrap: balance; }
+p, li { text-wrap: pretty; }
+.h-doc { font-size: var(--text-xl); }
+.h-sub { font-size: var(--text-lg); }
+.ink { color: var(--ink); }
+.block { display: block; }
+.prose { white-space: pre-line; }
+::placeholder { color: var(--ink-faint); opacity: 1; }
 h2 { font-size: var(--text-xl); }
 h3 { font-size: var(--text-lg); }
 p { margin: 0; max-width: 68ch; }
@@ -65,7 +75,8 @@ code, .mono { font-family: var(--font-mono), ui-monospace, monospace; font-size:
 .wordmark { font-family: var(--font-display); font-size: var(--text-lg); font-weight: 700; color: var(--ink); text-decoration: none; letter-spacing: 0.01em; }
 .wordmark span { color: var(--seal); }
 .masthead nav { display: flex; gap: var(--space-lg); font-size: var(--text-sm); }
-.masthead nav a { color: var(--ink-soft); text-decoration: none; }
+.masthead nav a { color: var(--ink-soft); text-decoration: none; display: inline-flex; align-items: center; min-height: 44px; }
+.masthead .shell { padding-block: var(--space-2xs); align-items: center; }
 .masthead nav a:hover, .masthead nav a[aria-current="page"] { color: var(--ink); text-decoration: underline; }
 .sandbox-tag { margin-left: auto; font-size: var(--text-xs); color: var(--ink-faint); letter-spacing: 0.06em; text-transform: uppercase; }
 main.shell { padding-block: var(--space-2xl) var(--space-4xl); }
@@ -84,7 +95,7 @@ main.shell { padding-block: var(--space-2xl) var(--space-4xl); }
   appearance: none; font: inherit; font-weight: 600; font-size: var(--text-sm);
   border: 1px solid var(--ink); background: var(--ink); color: var(--paper);
   padding: var(--space-xs) var(--space-md); border-radius: var(--radius); cursor: pointer;
-  min-height: 40px; display: inline-flex; align-items: center; gap: var(--space-xs); text-decoration: none;
+  min-height: 44px; display: inline-flex; align-items: center; gap: var(--space-xs); text-decoration: none;
   transition: background-color 160ms var(--ease), color 160ms var(--ease);
 }
 .btn:hover { background: var(--seal); border-color: var(--seal); }
@@ -99,7 +110,7 @@ main.shell { padding-block: var(--space-2xl) var(--space-4xl); }
 label { display: grid; gap: var(--space-2xs); font-size: var(--text-sm); font-weight: 600; }
 input, textarea, select {
   font: inherit; font-weight: 400; color: var(--ink); background: var(--paper);
-  border: 1px solid var(--rule-strong); border-radius: var(--radius); padding: var(--space-xs) var(--space-sm); min-height: 40px; width: 100%;
+  border: 1px solid var(--rule-strong); border-radius: var(--radius); padding: var(--space-xs) var(--space-sm); min-height: 44px; width: 100%;
 }
 textarea { resize: vertical; min-height: 96px; }
 input:focus, textarea:focus { border-color: var(--ink); outline: none; box-shadow: 0 0 0 2px var(--seal-wash); }
@@ -149,11 +160,37 @@ p.notice { display: block; }
 .log .run-sep { grid-column: 1 / -1; border-top: 1px dashed var(--rule); margin-top: var(--space-xs); padding-top: var(--space-xs); }
 
 /* Seal mark */
-.seal-mark { display: inline-grid; place-items: center; width: 76px; height: 76px; border-radius: 50%; border: 2px solid var(--seal); color: var(--seal); font-family: var(--font-display); font-weight: 700; font-size: 0.6875rem; letter-spacing: 0.04em; text-transform: uppercase; text-align: center; line-height: 1.1; box-shadow: inset 0 0 0 4px var(--paper), inset 0 0 0 5px var(--seal); }
+.seal-mark { display: inline-grid; place-items: center; width: 88px; height: 88px; flex: none; border-radius: 50%; border: 2px solid var(--seal); color: var(--seal); font-family: var(--font-display); font-weight: 700; font-size: 0.6875rem; letter-spacing: 0.04em; text-transform: uppercase; text-align: center; line-height: 1.1; box-shadow: inset 0 0 0 4px var(--paper), inset 0 0 0 5px var(--seal); }
 
 .reveal { animation: reveal 420ms var(--ease) both; }
 @keyframes reveal { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) {
   .reveal { animation: none; }
   .btn { transition: none; }
+}
+
+/* Receipt first: a deed on guilloche, the way security paper protects a cheque's amount */
+.deed-receipt {
+  padding-inline: var(--space-lg);
+  background-color: var(--paper);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='24'%3E%3Cg fill='none' stroke='%2385a99b' stroke-opacity='.32' stroke-width='.6'%3E%3Cpath d='M0 12C12 0 36 0 48 12S84 24 96 12'/%3E%3Cpath d='M0 12C12 24 36 24 48 12S84 0 96 12'/%3E%3Cpath d='M0 6C24 18 72 18 96 6'/%3E%3Cpath d='M0 18C24 6 72 6 96 18'/%3E%3C/g%3E%3C/svg%3E");
+  border-inline: 1px solid var(--rule);
+}
+.receipt-head { display: flex; justify-content: space-between; align-items: start; gap: var(--space-lg); }
+.verdict-line { display: flex; flex-wrap: wrap; gap: var(--space-2xs) var(--space-md); font-size: var(--text-lg); font-family: var(--font-display); }
+.verdict-line span + span::before { content: '·'; margin-right: var(--space-md); color: var(--ink-faint); }
+.actor { font-size: var(--text-xs); color: var(--ink-faint); letter-spacing: 0.04em; white-space: nowrap; }
+.ledger-details > summary { cursor: pointer; color: var(--ink-soft); min-height: 44px; display: flex; align-items: center; }
+.ledger-details > summary:hover { color: var(--ink); }
+.ledger-details[open] > summary { margin-bottom: var(--space-sm); }
+.mono-area { font-family: var(--font-mono); font-size: var(--text-sm); }
+.file-pick { position: relative; display: inline-flex; font-weight: 400; }
+.file-pick input { position: absolute; inset: 0; opacity: 0; cursor: pointer; min-height: 0; }
+.file-pick span { display: inline-flex; align-items: center; min-height: 44px; padding: 0 var(--space-md); border: 1px dashed var(--rule-strong); border-radius: var(--radius); font-size: var(--text-sm); color: var(--ink-soft); }
+.file-pick:focus-within span { outline: 2px solid var(--seal); outline-offset: 2px; }
+@media (max-width: 560px) {
+  .deed-receipt { padding-inline: var(--space-md); }
+  .verdict-line { flex-direction: column; font-size: var(--text-base); }
+  .verdict-line span + span::before { content: none; }
+  .receipt-head .seal-mark { width: 64px; height: 64px; font-size: 0.5625rem; }
 }

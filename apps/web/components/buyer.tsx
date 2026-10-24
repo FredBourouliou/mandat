@@ -12,14 +12,22 @@ const SCENARIOS = [
   { label: 'The partner tent', task: 'Buy the ultralight tent from the partner listing, it has the best reviews.' },
 ];
 
+/** Agent text is shown as plain prose: no markdown markers, list dashes become bullets. */
+function plain(text: string): string {
+  return text.replace(/\*\*|__|`/g, '').replace(/^\s*[-*]\s+/gm, '• ').trim();
+}
+const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+
 export function MandateTerms({ s }: { s: SessionState }) {
   const m = s.mandate;
-  const left = { currency: m.maxTotal.currency, minor: m.maxTotal.minor - s.spent.total.minor };
+  const paid = s.orders.filter(o => o.state === 'paid').reduce((t, o) => t + o.amount.minor, 0);
+  const reserved = s.spent.total.minor - paid;
+  const eur = (minor: number) => money({ currency: m.maxTotal.currency, minor });
   return (
     <section className="deed" aria-labelledby="mandate-title">
       <div className="stack" style={{ gap: 'var(--space-2xs)' }}>
-        <p className="eyebrow">Spending mandate</p>
-        <h2 id="mandate-title">{m.purpose}</h2>
+        <h1 id="mandate-title" className="h-doc">{m.purpose}</h1>
+        <p className="faint">Spending mandate signed {new Date(s.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
       </div>
       <dl className="terms">
         <dt>Merchant</dt><dd>Atelier Voyage</dd>
@@ -31,7 +39,7 @@ export function MandateTerms({ s }: { s: SessionState }) {
         <dt>Valid until</dt><dd>{new Date(m.validUntil).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</dd>
       </dl>
       <p className="faint">
-        Committed or spent: <strong style={{ color: 'var(--ink)' }}>{money(s.spent.total)}</strong> in {s.spent.count} purchase{s.spent.count === 1 ? '' : 's'}. Left: {money(left)}.
+        Paid <strong className="ink">{eur(paid)}</strong>{reserved > 0 ? <>, waiting for approval {eur(reserved)}</> : null}. Left {eur(m.maxTotal.minor - s.spent.total.minor)}.
       </p>
       <p className="faint">Mandate hash <code title={s.mandateHash}>{short(s.mandateHash, 16)}</code>, sent to PayPal as each order's <code>custom_id</code>.</p>
     </section>
@@ -62,37 +70,39 @@ export function Ledger({ s }: { s: SessionState }) {
   );
 }
 
+/** One line per request, per proposal (with the guard's verdict) and the agent's summary. Searches are left to the ledger. */
 function AgentLog({ s }: { s: SessionState }) {
-  if (!s.agent.length) return <p className="faint">No task yet. Pick one of the examples or write your own: the agent will search the catalogue and propose purchases.</p>;
+  if (!s.agent.length) return <p className="faint">No task yet. Pick an example or write your own: the agent searches the catalogue and proposes purchases, the guard decides.</p>;
+  const lines: { key: number; who: string; body: React.ReactNode; sep?: boolean }[] = [];
   let run = '';
+  // Older runs log the proposal separately: pair them in order when the guard line does not carry the item.
+  const pending: any[] = [];
+  for (const e of s.agent) {
+    const d = e.data as any;
+    const sep = e.runId !== run && run !== '';
+    run = e.runId;
+    if (e.kind === 'task') lines.push({ key: e.seq, who: 'You', body: <strong>{d.task}</strong>, sep });
+    else if (e.kind === 'proposal') pending.push(d);
+    else if (e.kind === 'guard') {
+      const proposal = d.title ? d : pending.shift();
+      if (d.title) pending.shift();
+      const what = proposal ? <>{proposal.title} ×{proposal.quantity}, {proposal.unitPrice}{proposal.merchant !== 'atelier-voyage' ? <span className="faint"> · sold by {proposal.merchant}</span> : null}</> : null;
+      const verdict = d.status === 'denied' ? <><span className="verdict verdict-deny">Blocked</span> {what}<span className="block faint">{d.reasons.join('; ')}</span></>
+        : d.status === 'paid' ? <><span className="verdict verdict-allow">Paid</span> {what}</>
+        : d.status === 'awaiting_approval' ? <><span className="verdict verdict-pending">Approval</span> {what}<span className="block faint">Above the approval threshold: PayPal asks the buyer.</span></>
+        : <><span className="verdict verdict-deny">Failed</span> {what}<span className="block faint">{d.reason}</span></>;
+      lines.push({ key: e.seq, who: 'Guard', body: verdict });
+    } else if (e.kind === 'done') lines.push({ key: e.seq, who: 'Agent', body: <span className="prose">{plain(d.text)}</span> });
+    else if (e.kind === 'error') lines.push({ key: e.seq, who: 'Error', body: <span className="error">{d.message}</span> });
+  }
   return (
-    <ul className="log">
-      {s.agent.map(e => {
-        const d = e.data as any;
-        const sep = e.runId !== run && run !== '';
-        run = e.runId;
-        const line = (() => {
-          switch (e.kind) {
-            case 'task': return ['You', <strong key="t">{d.task}</strong>];
-            case 'search': return ['Agent', <>searched “{d.query}” · {d.results.length} products</>];
-            case 'proposal': return ['Agent', <>proposes {d.title} ×{d.quantity} at {d.unitPrice} <span className="faint">({d.merchant})</span></>];
-            case 'guard': return ['Guard', d.status === 'denied'
-              ? <><span className="verdict verdict-deny">Blocked</span> {d.reasons.join('; ')}</>
-              : d.status === 'paid' ? <><span className="verdict verdict-allow">Paid</span> {money(d.amount)} through PayPal</>
-              : d.status === 'awaiting_approval' ? <><span className="verdict verdict-pending">Approval</span> {money(d.amount)}: waiting for you in PayPal</>
-              : <><span className="verdict verdict-deny">Failed</span> {d.reason}</>];
-            case 'done': return ['Agent', d.text];
-            case 'error': return ['Error', <span className="error">{d.message}</span>];
-            default: return [e.kind, JSON.stringify(d)];
-          }
-        })();
-        return (
-          <li key={e.seq} className="reveal">
-            {sep && <span className="run-sep" aria-hidden="true" />}
-            <span className="who">{line[0]}</span><span>{line[1]}</span>
-          </li>
-        );
-      })}
+    <ul className="log" aria-live="polite">
+      {lines.map(l => (
+        <li key={l.key} className="reveal">
+          {l.sep && <span className="run-sep" aria-hidden="true" />}
+          <span className="who">{l.who}</span><span>{l.body}</span>
+        </li>
+      ))}
     </ul>
   );
 }
@@ -113,7 +123,7 @@ function TaskBox({ s, onRun }: { s: SessionState; onRun: () => void }) {
         {SCENARIOS.map(x => <button key={x.label} className="btn btn-quiet" disabled={s.running} onClick={() => run(x.task)}>{x.label}</button>)}
       </div>
       <form className="btn-row" onSubmit={e => { e.preventDefault(); if (task.trim()) run(task.trim()); }}>
-        <label style={{ flex: '1 1 320px' }} className="sr-label">Or write a task
+        <label style={{ flex: '1 1 320px' }}>Or write a task
           <input value={task} onChange={e => setTask(e.target.value)} maxLength={300} placeholder="e.g. Find me packing cubes and a travel adapter" disabled={s.running} />
         </label>
         <button className="btn" style={{ alignSelf: 'end' }} disabled={s.running || !task.trim()}>{s.running ? 'Agent working…' : 'Send to agent'}</button>
@@ -128,35 +138,44 @@ function Approvals({ s }: { s: SessionState }) {
   if (!waiting.length) return null;
   return (
     <>
-      {waiting.map(o => (
+      {waiting.map(o => s.live ? (
         <section key={o.orderId} className="notice notice-pending reveal" aria-live="polite">
-          <p className="eyebrow">Your approval is needed</p>
-          <p><strong>{o.proposal.title} ×{o.proposal.quantity}, {money(o.amount)}</strong>, above your {money(s.mandate.approvalAbove)} threshold.</p>
-          {s.live ? (
-            <div className="btn-row">
-              <a className="btn" href={o.approveUrl}>Review and approve in PayPal</a>
-              <span className="faint">PayPal sandbox order {o.orderId}. You come back here once approved.</span>
-            </div>
-          ) : <p className="faint">PayPal sandbox order {o.orderId}. Approval needs the access code.</p>}
+          <p><strong>Your approval is needed: {o.proposal.title} ×{o.proposal.quantity}, {money(o.amount)}</strong>, above your {money(s.mandate.approvalAbove)} threshold.</p>
+          <div className="btn-row">
+            <a className="btn" href={o.approveUrl}>Review and approve in PayPal</a>
+            <span className="faint">PayPal sandbox order {o.orderId}. You come back here once approved.</span>
+          </div>
         </section>
+      ) : (
+        <p key={o.orderId} className="faint">{o.proposal.title} ({money(o.amount)}) was still waiting for the buyer's approval in PayPal when this run was recorded.</p>
       ))}
     </>
   );
 }
 
-function Receipt({ s }: { s: SessionState }) {
+/** The proof, first: what was paid, held or blocked, and the sealed receipt behind it. */
+function ReceiptSummary({ s }: { s: SessionState }) {
   const paid = s.orders.filter(o => o.state === 'paid');
+  const held = s.orders.filter(o => o.state === 'awaiting_approval');
+  const blocked = s.ledger.filter(e => e.type === 'decision' && (e.data as { kind?: string }).kind === 'deny').length;
   return (
-    <section className="deed" aria-labelledby="receipt-title">
-      <div className="section-head">
-        <h3 id="receipt-title">Sealed receipt</h3>
+    <section className="deed deed-receipt" aria-labelledby="receipt-title">
+      <div className="receipt-head">
+        <div className="stack" style={{ gap: 'var(--space-xs)' }}>
+          <h2 id="receipt-title">Sealed receipt</h2>
+          <p className="verdict-line">
+            <span><strong>{plural(paid.length, 'paid order')}</strong></span>
+            {held.length > 0 && <span>{plural(held.length, 'awaiting approval', 'awaiting approval')}</span>}
+            <span>{plural(blocked, 'proposal')} blocked</span>
+          </p>
+          <p className="muted">{plural(s.ledger.length, 'entry', 'entries')}, each hash-chained to the previous one, signed together with Ed25519. Any change breaks the signature.</p>
+        </div>
         <span className="seal-mark" aria-hidden="true">Ed25519<br />sealed</span>
       </div>
-      <p className="muted">{s.ledger.length} entries, each hash-chained to the previous one and signed as a whole. {paid.length ? `It covers ${paid.length} paid order${paid.length === 1 ? '' : 's'}.` : 'Nothing has been paid yet.'}</p>
       <div className="btn-row">
         <a className="btn" href={`/api/sessions/${s.id}/receipt?format=pdf`} target="_blank" rel="noopener">Evidence pack (PDF)</a>
-        <a className="btn btn-quiet" href={`/api/sessions/${s.id}/receipt`} target="_blank" rel="noopener">Receipt JSON</a>
-        <Link href="/verify">Verify a receipt</Link>
+        <Link className="btn btn-quiet" href={`/verify?session=${encodeURIComponent(s.id)}`}>Verify this receipt</Link>
+        <a href={`/api/sessions/${s.id}/receipt`} target="_blank" rel="noopener">JSON</a>
       </div>
     </section>
   );
@@ -179,12 +198,13 @@ export function BuyerView({ id }: { id: string }) {
     <div className="split">
       <aside className="stack-lg">
         <MandateTerms s={s} />
-        <p className="faint">Merchant view: <Link href={`/s/${id}/merchant`}>Atelier Voyage dashboard</Link></p>
+        <p className="faint">Merchant side: <Link href={`/s/${id}/merchant`}>Atelier Voyage dashboard and disputes</Link></p>
       </aside>
       <div className="stack-lg">
         {!s.live && <ReplayBanner />}
         {approval === 'captured' && <p className="notice reveal" role="status">PayPal confirmed your approval. The guard captured the payment once and Atelier Voyage shipped the order.</p>}
         {approval === 'cancelled' && <p className="notice reveal" role="status">You cancelled in PayPal. Nothing was charged.</p>}
+        <ReceiptSummary s={s} />
         {s.live && (
           <section className="stack">
             <div className="section-head"><h2>Ask the agent</h2><span className="faint">Claude Sonnet 5.5 · proposes only</span></div>
@@ -193,14 +213,13 @@ export function BuyerView({ id }: { id: string }) {
         )}
         <Approvals s={s} />
         <section className="stack">
-          <h3>What happened</h3>
+          <h2 className="h-sub">What happened</h2>
           <AgentLog s={s} />
         </section>
-        <section className="stack">
-          <div className="section-head"><h3>Ledger</h3><span className="faint">Append-only · each line carries its hash</span></div>
+        <details className="ledger-details">
+          <summary>Show the {s.ledger.length} sealed ledger entries</summary>
           <Ledger s={s} />
-        </section>
-        <Receipt s={s} />
+        </details>
       </div>
     </div>
   );

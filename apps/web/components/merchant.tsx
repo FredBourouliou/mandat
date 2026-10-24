@@ -102,23 +102,25 @@ export function MerchantView({ id }: { id: string }) {
   return (
     <div className="stack-lg">
       <section className="stack" style={{ maxWidth: '64ch' }}>
-        <p className="eyebrow">Atelier Voyage · merchant dashboard</p>
-        <h1>Orders placed by an AI agent</h1>
-        <p className="lede">Each order carries the hash of the buyer's mandate. If the payment is disputed, the sealed receipt becomes the evidence.</p>
+        <h1>Atelier Voyage: orders placed by an AI agent</h1>
+        <p className="lede">Each order carries the hash of the buyer's mandate. When a payment is disputed, the sealed receipt becomes the evidence.</p>
         <p className="faint"><Link href={`/s/${id}`}>Back to the buyer's view</Link></p>
       </section>
       {!s.live && <ReplayBanner />}
-      {!paid.length && <p className="notice">No paid orders yet. Run the agent from the buyer's view first.</p>}
+      {s.disputes.map(d => <DisputeCard key={d.id} d={d} live={s.live} onChange={reload} />)}
+      {!paid.length && <p className="notice">No paid orders yet. Run the agent from <Link href={`/s/${id}`}>the buyer's view</Link> first.</p>}
       {paid.length > 0 && (
+        <section className="stack">
+        <h2 className="h-sub">Paid orders</h2>
         <ol className="ledger" aria-label="Paid orders">
-          {paid.map(o => {
+          {paid.map((o, i) => {
             const t = tracking(o.orderId);
             const disputed = s.disputes.some(d => d.orderId === o.orderId);
             return (
               <li key={o.orderId}>
-                <span className="seq">{money(o.amount).split(' ')[0]}</span>
+                <span className="seq">#{i + 1}</span>
                 <span className="what">
-                  <span>{o.proposal.title} ×{o.proposal.quantity}</span>
+                  <span>{o.proposal.title} ×{o.proposal.quantity} · <strong>{money(o.amount)}</strong></span>
                   <span className="faint">PayPal order <code>{o.orderId}</code> · custom_id <code title={s.mandateHash}>{short(s.mandateHash, 12)}</code>{t ? ` · ${t.carrier} ${t.trackingNumber}` : ''}</span>
                 </span>
                 {disputed ? <span className="verdict verdict-pending">Disputed</span> : s.live && (
@@ -132,9 +134,9 @@ export function MerchantView({ id }: { id: string }) {
             );
           })}
         </ol>
+        </section>
       )}
       {err && <p className="error" role="alert">{err}</p>}
-      {s.disputes.map(d => <DisputeCard key={d.id} d={d} live={s.live} onChange={reload} />)}
     </div>
   );
 }

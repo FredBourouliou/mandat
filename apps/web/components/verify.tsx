@@ -1,17 +1,31 @@
 'use client';
-import { useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { useCallback, useEffect, useState } from 'react';
 
 type Result = { valid: boolean; reason?: string; entries?: number; keyId?: string };
 
-export function VerifyForm() {
+export function VerifyForm({ demoSession }: { demoSession: string }) {
+  const fromRun = useSearchParams().get('session');
   const [text, setText] = useState('');
   const [result, setResult] = useState<Result | null>(null);
-  const [tampered, setTampered] = useState('');
-  const check = async (body: string) => {
+  const [note, setNote] = useState('');
+
+  const check = useCallback(async (body: string) => {
     const r = await fetch('/api/verify', { method: 'POST', body });
     setResult(await r.json());
-  };
-  // Changes one character inside the last entry's data, the way a forger would.
+  }, []);
+
+  const load = useCallback(async (session: string) => {
+    const r = await fetch(`/api/sessions/${encodeURIComponent(session)}/receipt`, { cache: 'no-store' });
+    if (!r.ok) { setNote('This run has no receipt.'); return; }
+    const body = JSON.stringify(await r.json(), null, 2);
+    setText(body); setNote('Receipt loaded from the run.');
+    void check(body);
+  }, [check]);
+
+  useEffect(() => { if (fromRun) void load(fromRun); }, [fromRun, load]);
+
+  // Changes one digit inside the last entry's data, the way a forger would.
   const tamper = () => {
     try {
       const r = JSON.parse(text);
@@ -22,23 +36,31 @@ export function VerifyForm() {
       const digit = json[i] === '9' ? '8' : String(Number(json[i]) + 1);
       last.data = JSON.parse(json.slice(0, i) + digit + json.slice(i + 1));
       const next = JSON.stringify(r, null, 2);
-      setText(next); setTampered(`Changed one digit in entry #${last.seq} (${last.type}).`);
+      setText(next); setNote(`Changed one digit in entry #${last.seq} (${last.type}).`);
       void check(next);
     } catch { setResult({ valid: false, reason: 'not valid JSON' }); }
   };
+
+  const edit = (v: string) => { setText(v); setResult(null); setNote(''); };
   return (
     <div className="stack">
+      {!text && (fromRun || demoSession) && (
+        <div className="btn-row">
+          <button className="btn btn-quiet" onClick={() => load(fromRun || demoSession)}>Load the {fromRun ? "run's" : 'recorded demo'} receipt</button>
+        </div>
+      )}
       <label>Receipt JSON
-        <textarea value={text} onChange={e => { setText(e.target.value); setResult(null); setTampered(''); }} rows={12} spellCheck={false} style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-sm)' }} placeholder='{"mandateHash": "…", "entries": [ … ], "signature": "…"}' />
-      </label>
-      <label className="faint" style={{ fontWeight: 400 }}>Or load a file
-        <input type="file" accept="application/json,.json" onChange={async e => { const f = e.target.files?.[0]; if (f) { setText(await f.text()); setResult(null); setTampered(''); } }} />
+        <textarea value={text} onChange={e => edit(e.target.value)} rows={12} spellCheck={false} className="mono-area" placeholder='{"mandateHash": "…", "entries": [ … ], "signature": "…"}' />
       </label>
       <div className="btn-row">
         <button className="btn" disabled={!text.trim()} onClick={() => check(text)}>Verify</button>
         <button className="btn btn-quiet" disabled={!text.trim()} onClick={tamper}>Tamper with one byte</button>
+        <label className="file-pick">
+          <input type="file" accept="application/json,.json" onChange={async e => { const f = e.target.files?.[0]; if (f) edit(await f.text()); }} />
+          <span>Open a .json file</span>
+        </label>
       </div>
-      {tampered && <p className="faint">{tampered}</p>}
+      {note && <p className="faint">{note}</p>}
       {result && (
         <p className={`notice reveal ${result.valid ? '' : 'notice-seal'}`} role="status">
           {result.valid

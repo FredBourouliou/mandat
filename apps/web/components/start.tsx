@@ -15,8 +15,8 @@ export function AccessForm() {
   const [error, setError] = useState('');
   return (
     <section className="deed" style={{ maxWidth: '62ch' }}>
-      <h2>Live demo</h2>
-      <p className="muted">Live runs call Claude and the PayPal sandbox, so they need the access code given to the judges. Without it, watch the video or run the project locally (see the README).</p>
+      <h2>Run it live</h2>
+      <p className="muted">Live runs call Claude and the PayPal sandbox, so they need the access code given to the judges. Without it, replay the recorded run above, or run the project locally from the README.</p>
       <form className="btn-row" onSubmit={async e => {
         e.preventDefault(); setError('');
         try { await post('/api/access', { code }); router.refresh(); } catch (err) { setError((err as Error).message); }
