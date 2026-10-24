@@ -32,17 +32,23 @@ export function AccessForm() {
 
 export function MandateForm() {
   const router = useRouter();
-  const [f, setF] = useState({ purpose: 'Gear for a three-day hike in the Jura', maxTotal: 200, maxPerPurchase: 130, approvalAbove: 80, maxPurchases: 4, days: 7 });
+  // Number fields keep the raw text, so a field can be emptied and retyped without snapping to 0.
+  const [f, setF] = useState({ purpose: 'Gear for a three-day hike in the Jura', maxTotal: '200', maxPerPurchase: '130', approvalAbove: '80', maxPurchases: '4', days: '7' });
+  const n = (k: Exclude<keyof typeof f, 'purpose'>) => Number(f[k] || 0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const num = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: Number(e.target.value) });
+  const num = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value });
+  const invalid = ([['maxTotal', 10, 200], ['maxPerPurchase', 10, 200], ['approvalAbove', 0, 200], ['maxPurchases', 1, 10], ['days', 1, 30]] as const)
+    .some(([k, lo, hi]) => f[k] === '' || n(k) < lo || n(k) > hi || !Number.isInteger(n(k)));
   return (
     <form className="deed narrow" onSubmit={async e => {
-      e.preventDefault(); setBusy(true); setError('');
+      e.preventDefault(); setError('');
+      if (invalid) { setError('Amounts go from 10 to 200 EUR (threshold from 0), 1 to 10 purchases, 1 to 30 days, whole numbers.'); return; }
+      setBusy(true);
       try {
         const { id } = await post('/api/sessions', {
-          purpose: f.purpose, maxTotal: f.maxTotal * 100, maxPerPurchase: f.maxPerPurchase * 100,
-          approvalAbove: f.approvalAbove * 100, maxPurchases: f.maxPurchases, days: f.days,
+          purpose: f.purpose, maxTotal: n('maxTotal') * 100, maxPerPurchase: n('maxPerPurchase') * 100,
+          approvalAbove: n('approvalAbove') * 100, maxPurchases: n('maxPurchases'), days: n('days'),
         });
         router.push(`/s/${id}`);
       } catch (err) { setError((err as Error).message); setBusy(false); }
@@ -57,9 +63,9 @@ export function MandateForm() {
         <label>Valid for (days)<input type="number" min={1} max={30} value={f.days} onChange={num('days')} /></label>
       </div>
       <p className="notice" aria-live="polite">
-        <strong>What you are signing:</strong> the agent can spend at most {f.maxTotal} EUR in total, on outdoor and travel items from Atelier Voyage, {Math.min(f.maxPerPurchase, f.maxTotal)} EUR per purchase,
-        in {f.maxPurchases} purchase{f.maxPurchases === 1 ? '' : 's'} or fewer, for {f.days} day{f.days === 1 ? '' : 's'}.
-        {f.approvalAbove > 0 ? ` Above ${f.approvalAbove} EUR, PayPal asks for your approval first.` : ' Every purchase goes to PayPal for your approval.'} Nothing else can be bought.
+        <strong>What you are signing:</strong> the agent can spend at most {n('maxTotal')} EUR in total, on outdoor and travel items from Atelier Voyage, {Math.min(n('maxPerPurchase'), n('maxTotal'))} EUR per purchase,
+        in {n('maxPurchases')} purchase{n('maxPurchases') === 1 ? '' : 's'} or fewer, for {n('days')} day{n('days') === 1 ? '' : 's'}.
+        {n('approvalAbove') > 0 ? ` Above ${n('approvalAbove')} EUR, PayPal asks for your approval first.` : ' Every purchase goes to PayPal for your approval.'} Nothing else can be bought.
       </p>
       <div className="btn-row">
         <button className="btn btn-seal" disabled={busy}>{busy ? 'Sealing…' : 'Sign and hand to the agent'}</button>
