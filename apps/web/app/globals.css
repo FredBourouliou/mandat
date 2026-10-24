@@ -4,7 +4,7 @@
   --paper: oklch(97.3% 0.011 165);
   --paper-sunk: oklch(94.8% 0.016 165);
   --rule: oklch(85.5% 0.02 165);
-  --rule-strong: oklch(67% 0.022 170);
+  --rule-strong: oklch(60% 0.024 170);
   --ink: oklch(24% 0.022 235);
   --ink-soft: oklch(41% 0.02 225);
   --ink-faint: oklch(49% 0.018 215);
@@ -120,7 +120,8 @@ input, textarea, select {
   border: 1px solid var(--rule-strong); border-radius: var(--radius); padding: var(--space-xs) var(--space-sm); min-height: 44px; width: 100%;
 }
 textarea { resize: vertical; min-height: 96px; }
-input:focus, textarea:focus { border-color: var(--ink); outline: none; box-shadow: 0 0 0 2px var(--seal-wash); }
+input:focus, textarea:focus { border-color: var(--ink); outline: none; }
+input:focus-visible, textarea:focus-visible { outline: 2px solid var(--seal); outline-offset: 2px; }
 .field-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: var(--space-md); }
 .error { color: var(--seal); font-size: var(--text-sm); }
 
