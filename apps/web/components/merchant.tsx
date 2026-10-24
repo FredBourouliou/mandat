@@ -85,7 +85,7 @@ function DisputeCard({ d, live, onChange }: { d: Dispute; live: boolean; onChang
           <div className="btn-row"><button className="btn btn-quiet" onClick={() => act('outcome')} disabled={Boolean(busy)}>Simulate PayPal's decision</button></div>
         </div>
       )}
-      {d.simulatedOutcome && <p className="notice reveal" role="status"><span className="verdict verdict-allow">Simulated</span> PayPal's decision is simulated (the sandbox cannot rule on chargebacks): resolved in the seller's favour: the evidence showed a mandate-bound, approved and shipped purchase.</p>}
+      {d.simulatedOutcome && <p className="notice reveal" role="status"><span className="verdict verdict-allow">Simulated</span> PayPal's decision is simulated (the sandbox cannot rule on chargebacks): resolved in the seller's favour: the evidence showed a purchase made within the buyer's mandate and shipped with tracking.</p>}
       {error && <p className="error" role="alert">{error}</p>}
     </section>
   );

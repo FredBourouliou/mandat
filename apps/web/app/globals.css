@@ -55,7 +55,7 @@ h1, h2, h3 { font-family: var(--font-display), Georgia, serif; font-weight: 600;
 h1 { font-size: var(--text-2xl); }
 h1, h2, h3 { text-wrap: balance; }
 p, li { text-wrap: pretty; }
-.h-doc { font-size: var(--text-xl); }
+.h-doc { font-size: var(--text-xl); text-wrap: pretty; }
 .h-sub { font-size: var(--text-lg); }
 .ink { color: var(--ink); }
 .block { display: block; }

@@ -92,6 +92,14 @@ function AgentLog({ s }: { s: SessionState }) {
         : d.status === 'awaiting_approval' ? <><span className="verdict verdict-pending">Approval</span> {what}<span className="block faint">Above the approval threshold: PayPal asks the buyer.</span></>
         : <><span className="verdict verdict-deny">Failed</span> {what}<span className="block faint">{d.reason}</span></>;
       lines.push({ key: e.seq, who: 'Guard', body: verdict });
+      // The human step happens in PayPal, outside the agent: show it where the story needs it.
+      const captured = d.status === 'awaiting_approval' && s.ledger.find(x => x.type === 'order.captured' && (x.data as any).orderId === d.orderId);
+      if (captured) {
+        const c = captured.data as any;
+        lines.push({ key: e.seq + 0.5, who: 'You', body: c.status === 'COMPLETED'
+          ? <><span className="verdict verdict-allow">Paid</span> approved in PayPal at {time(captured.at)}<span className="block faint">Payer {c.payerId} · capture {c.captureId}</span></>
+          : <><span className="verdict verdict-deny">Failed</span> capture {c.status}</> });
+      }
     } else if (e.kind === 'done') lines.push({ key: e.seq, who: 'Agent', body: <span className="prose">{plain(d.text)}</span> });
     else if (e.kind === 'error') lines.push({ key: e.seq, who: 'Error', body: <span className="error">{d.message}</span> });
   }
