@@ -122,7 +122,7 @@ export function MerchantView({ id }: { id: string }) {
                 <span className="seq">#{i + 1}</span>
                 <span className="what">
                   <span>{o.proposal.title} ×{o.proposal.quantity} · <strong>{money(o.amount)}</strong></span>
-                  <span className="faint">PayPal order <code>{o.orderId}</code> · {o.mode === 'direct' ? 'card' : 'PayPal account'} · custom_id <code title={s.mandateHash}>{short(s.mandateHash, 12)}</code>{t ? ` · ${t.carrier} ${t.trackingNumber}` : ''}</span>
+                  <span className="faint">PayPal order <code>{o.orderId}</code> · {o.mode === 'direct' ? 'card' : 'PayPal account'} · custom_id <code>{short(s.mandateHash, 12)}</code>{t ? ` · ${t.carrier} ${t.trackingNumber}` : ''}</span>
                 </span>
                 {disputed ? <span className="verdict verdict-pending">Disputed</span> : o.mode !== 'direct' ? <span className="faint">No chargeback (PayPal account)</span> : s.live && (
                   <button className="btn btn-quiet" aria-disabled={Boolean(busy)} onClick={async () => {

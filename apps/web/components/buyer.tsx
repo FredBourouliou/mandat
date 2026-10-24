@@ -41,7 +41,7 @@ export function MandateTerms({ s }: { s: SessionState }) {
       <p className="faint">
         Paid <strong className="ink">{eur(paid)}</strong>{reserved > 0 ? <>, waiting for approval {eur(reserved)}</> : null}. Left {eur(m.maxTotal.minor - s.spent.total.minor)}.
       </p>
-      <p className="faint">Mandate hash <code title={s.mandateHash}>{short(s.mandateHash, 16)}</code>, sent to PayPal as each order's <code>custom_id</code>.</p>
+      <p className="faint">Mandate hash <code>{short(s.mandateHash, 16)}</code>, sent to PayPal as each order's <code>custom_id</code>.</p>
     </section>
   );
 }
@@ -57,7 +57,7 @@ export function Ledger({ s }: { s: SessionState }) {
             <span className="what">
               <span>{d.label}</span>
               {d.detail && <span className="faint">{d.detail}</span>}
-              <span className="hash" title={e.hash}>{short(e.hash, 24)}</span>
+              <span className="hash">{short(e.hash, 24)}</span>
             </span>
             <span className="stack" style={{ gap: 'var(--space-2xs)', justifyItems: 'end' }}>
               {d.verdict && <span className={`verdict verdict-${d.verdict[0]}`}>{d.verdict[1]}</span>}
@@ -181,7 +181,7 @@ function ReceiptSummary({ s }: { s: SessionState }) {
           <p className="verdict-line">
             <span><strong>{plural(paid.length, 'paid order')}</strong></span>
             {held.length > 0 && <span>{plural(held.length, 'awaiting approval', 'awaiting approval')}</span>}
-            <span>{plural(blocked, 'proposal')} blocked</span>
+            <span>{`${plural(blocked, 'proposal')} blocked`}</span>
           </p>
           <p className="muted">{plural(s.ledger.length, 'entry', 'entries')}, each hash-chained to the previous one, signed together with Ed25519. Any change breaks the signature.</p>
         </div>
