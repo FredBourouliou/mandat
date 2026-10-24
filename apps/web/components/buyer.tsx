@@ -48,7 +48,7 @@ export function MandateTerms({ s }: { s: SessionState }) {
 
 export function Ledger({ s }: { s: SessionState }) {
   return (
-    <ol className="ledger" aria-label="Sealed ledger">
+    <ol role="list" className="ledger" aria-label="Sealed ledger">
       {s.ledger.map(e => {
         const d = describeEntry(e.type, e.data);
         return (
@@ -111,7 +111,7 @@ function AgentLog({ s }: { s: SessionState }) {
   lines.push(...later);
   if (s.running) lines.push({ key: -1, who: 'Agent', body: <span className="working">Searching the catalogue and proposing</span> });
   return (
-    <ul className="log" aria-live="polite">
+    <ul role="list" className="log" aria-live="polite">
       {lines.map(l => (
         <li key={l.key} className="reveal">
           {l.sep && <span className="run-sep" aria-hidden="true" />}

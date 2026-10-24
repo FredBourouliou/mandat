@@ -113,7 +113,7 @@ export function MerchantView({ id }: { id: string }) {
       {paid.length > 0 && (
         <section className="stack">
         <h2 className="h-sub">Paid orders</h2>
-        <ol className="ledger" aria-label="Paid orders">
+        <ol role="list" className="ledger" aria-label="Paid orders">
           {paid.map((o, i) => {
             const t = tracking(o.orderId);
             const disputed = s.disputes.some(d => d.orderId === o.orderId);

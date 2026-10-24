@@ -19,9 +19,10 @@ export function AccessForm() {
       <p className="muted">Live runs call Claude and the PayPal sandbox, so they need the access code given to the judges. Without it, replay the recorded run above, or run the project locally from the README.</p>
       <form className="btn-row" onSubmit={async e => {
         e.preventDefault(); setError('');
+        if (!code.trim()) { setError('Enter the access code.'); return; }
         try { await post('/api/access', { code }); router.refresh(); } catch (err) { setError((err as Error).message); }
       }}>
-        <label style={{ flex: '1 1 220px' }}>Access code<input value={code} onChange={e => setCode(e.target.value)} autoComplete="off" required /></label>
+        <label style={{ flex: '1 1 220px' }}>Access code<input value={code} onChange={e => setCode(e.target.value)} autoComplete="off" /></label>
         <button className="btn" style={{ alignSelf: 'end' }}>Unlock</button>
       </form>
       {error && <p className="error" role="alert">{error}</p>}

@@ -17,7 +17,7 @@ export default async function Home() {
           You approve anything above your threshold. Every step is sealed into a receipt the merchant can show if the payment is ever disputed.
         </p>
       </section>
-      <ol className="ledger narrow" aria-label="Who decides what">
+      <ol role="list" className="ledger narrow" aria-label="Who decides what">
         <li><span className="seq">1</span><span className="what"><strong>The agent proposes</strong><span className="faint">Claude searches the catalogue. It has no payment authority.</span></span><span className="actor">Claude</span></li>
         <li><span className="seq">2</span><span className="what"><strong>The guard decides</strong><span className="faint">Merchant, category, per-purchase and total limits, dates, number of purchases.</span></span><span className="actor">Code</span></li>
         <li><span className="seq">3</span><span className="what"><strong>You approve</strong><span className="faint">Above your threshold, PayPal asks you directly.</span></span><span className="actor">You</span></li>
