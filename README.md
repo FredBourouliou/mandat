@@ -1,6 +1,6 @@
 # Mandat
 
-**Your AI can shop. It can't overspend.**
+**Every purchase your AI makes, provable.**
 
 Mandat lets an AI shopping agent buy on PayPal under a spending mandate you sign once. The agent (Claude) proposes purchases. A deterministic guard checks each one against the mandate and pays through PayPal. You approve anything above your threshold. Every step is hash-chained and signed into a receipt, so if the payment is disputed, the merchant can show exactly who authorized what.
 

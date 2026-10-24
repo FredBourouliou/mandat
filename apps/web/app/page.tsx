@@ -27,7 +27,7 @@ export default async function Home() {
   return (
     <div className="stack-lg">
       <section className="stack narrow">
-        <h1>Your AI can shop. It can’t overspend.</h1>
+        <h1>Every purchase your AI makes, provable.</h1>
         <p className="lede">
           Sign the rules once: merchant, budget, approval threshold. Claude proposes purchases, a deterministic guard enforces
           your mandate and pays through PayPal, and every decision is sealed into a receipt the merchant can show if the payment is disputed.
