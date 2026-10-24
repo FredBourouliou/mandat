@@ -164,7 +164,7 @@ p.notice { display: block; }
 
 /* Agent log: plain transcript lines */
 .log { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-xs); font-size: var(--text-sm); }
-.log li { display: grid; grid-template-columns: 6.5rem 1fr; gap: var(--space-sm); }
+.log > li { display: grid; grid-template-columns: 6.5rem 1fr; gap: var(--space-sm); }
 .log .who { color: var(--ink-faint); font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.06em; padding-top: 2px; }
 .log .run-sep { grid-column: 1 / -1; border-top: 1px dashed var(--rule); margin-top: var(--space-xs); padding-top: var(--space-xs); }
 
@@ -209,3 +209,21 @@ p.notice { display: block; }
 .choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: var(--space-2xl); align-items: start; }
 .steps { margin: 0; padding-left: 1.4em; display: grid; gap: var(--space-2xs); }
 .steps li::marker { color: var(--seal); font-family: var(--font-display); font-weight: 700; }
+
+/* Agent proposes | guard decides: two halves, a double rule between them (two 1px borders, not an accent stripe) */
+.log > .log-wide { grid-template-columns: minmax(0, 1fr); }
+.exchange { display: grid; grid-template-columns: minmax(0, 1fr) 5px minmax(0, 1fr); border: 1px solid var(--rule); border-radius: var(--radius); background-color: var(--paper); }
+.ex-side { display: grid; align-content: start; gap: var(--space-2xs); padding: var(--space-sm) var(--space-md); min-width: 0; }
+.ex-border { border-inline: 1px solid var(--ink); }
+.ex-label { font-size: var(--text-xs); font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-faint); }
+.ex-reason { font-style: italic; }
+.ex-rules { margin: 0; padding-left: 1.1em; display: grid; gap: 2px; font-size: var(--text-sm); color: var(--ink-soft); }
+.exchange-deny .ex-guard { background-color: var(--seal-wash); }
+.exchange-deny .ex-rules { color: var(--ink); }
+.exchange-pending .ex-guard { background-color: var(--pending-wash); }
+@media (max-width: 640px) {
+  .exchange { grid-template-columns: minmax(0, 1fr); }
+  .ex-border { border-inline: 0; border-block: 1px solid var(--ink); height: 5px; }
+}
+.ex-injection { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--seal); border: 1px dashed var(--seal); border-radius: var(--radius); padding: var(--space-xs); display: grid; gap: 2px; margin-top: var(--space-2xs); }
+.ex-injection .ex-label { font-family: var(--font-body); color: var(--seal); }

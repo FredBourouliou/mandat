@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import type { SessionState } from '@/lib/state';
+import { findProduct } from '@/lib/catalog';
 import { describeEntry, money, short, time } from './format';
 import { post, useSession } from './use-session';
 
@@ -70,10 +71,42 @@ export function Ledger({ s }: { s: SessionState }) {
   );
 }
 
+const sentence = (r: string) => r.charAt(0).toUpperCase() + r.slice(1) + '.';
+
+/** The core of Mandat in one row: what the agent asked for, a hard border, what the guard decided and why. */
+function Exchange({ d, item, approvalAbove }: { d: any; item: any; approvalAbove: string }) {
+  const verdict = d.status === 'denied' ? ['deny', 'Blocked'] : d.status === 'paid' ? ['allow', 'Paid'] : d.status === 'awaiting_approval' ? ['pending', 'Approval'] : ['deny', 'Failed'];
+  const rules: string[] = d.status === 'denied' ? d.reasons.map(sentence)
+    : d.status === 'paid' ? ['Within every limit of the mandate.', 'Paid through PayPal and captured once.']
+    : d.status === 'awaiting_approval' ? ['Within the limits of the mandate.', `Above ${approvalAbove}: PayPal asks the buyer first.`]
+    : [sentence(String(d.reason))];
+  return (
+    <div className={`exchange exchange-${verdict[0]}`}>
+      <div className="ex-side">
+        <p className="ex-label">Agent proposes</p>
+        {item ? <>
+          <p><strong>{item.title} ×{item.quantity}</strong></p>
+          <p className="faint">{item.unitPrice} each · sold by {item.merchant}</p>
+          {item.reason && <p className="faint ex-reason">“{item.reason}”</p>}
+          {findProduct(item.sku)?.injection && (
+            <p className="ex-injection"><span className="ex-label">Hidden in the listing</span> {findProduct(item.sku)!.injection}</p>
+          )}
+        </> : <p className="faint">Proposal</p>}
+      </div>
+      <div className="ex-border" aria-hidden="true" />
+      <div className="ex-side ex-guard">
+        <p className="ex-label">Guard decides</p>
+        <p><span className={`verdict verdict-${verdict[0]}`}>{verdict[1]}</span><span className="sr-only">: </span>{d.amount ? <> {money(d.amount)}</> : null}</p>
+        <ul className="ex-rules">{rules.map((r, i) => <li key={i}>{r}</li>)}</ul>
+      </div>
+    </div>
+  );
+}
+
 /** One line per request, per proposal (with the guard's verdict) and the agent's summary. Searches are left to the ledger. */
 function AgentLog({ s }: { s: SessionState }) {
   if (!s.agent.length) return <p className="faint">No task yet. Pick an example or write your own: the agent searches the catalogue and proposes purchases, the guard decides.</p>;
-  const lines: { key: number; who: string; body: React.ReactNode; sep?: boolean }[] = [];
+  const lines: { key: number; who: string; body: React.ReactNode; sep?: boolean; wide?: boolean }[] = [];
   let run = '';
   // Older runs log the proposal separately: pair them in order when the guard line does not carry the item.
   const pending: any[] = [];
@@ -86,14 +119,10 @@ function AgentLog({ s }: { s: SessionState }) {
     if (e.kind === 'task') lines.push({ key: e.seq, who: 'You', body: <strong>{d.task}</strong>, sep });
     else if (e.kind === 'proposal') pending.push(d);
     else if (e.kind === 'guard') {
-      const proposal = d.title ? d : pending.shift();
-      if (d.title) pending.shift();
-      const what = proposal ? <>{proposal.title} ×{proposal.quantity}, {proposal.unitPrice}{proposal.merchant !== 'atelier-voyage' ? <span className="faint"> · sold by {proposal.merchant}</span> : null}</> : null;
-      const verdict = d.status === 'denied' ? <><span className="verdict verdict-deny">Blocked</span><span className="sr-only">: </span> {what}<span className="block faint">{d.reasons.join('; ')}</span></>
-        : d.status === 'paid' ? <><span className="verdict verdict-allow">Paid</span><span className="sr-only">: </span> {what}</>
-        : d.status === 'awaiting_approval' ? <><span className="verdict verdict-pending">Approval</span><span className="sr-only">: </span> {what}<span className="block faint">Above the approval threshold: PayPal asks the buyer.</span></>
-        : <><span className="verdict verdict-deny">Failed</span><span className="sr-only">: </span> {what}<span className="block faint">{d.reason}</span></>;
-      lines.push({ key: e.seq, who: 'Guard', body: verdict });
+      // The proposal event carries the agent's reason; newer guard events also carry the item.
+      const prop = pending.shift();
+      const item = d.title ? { ...prop, ...d } : prop;
+      lines.push({ key: e.seq, who: '', wide: true, body: <Exchange d={d} item={item} approvalAbove={money(s.mandate.approvalAbove)} /> });
       // The human step happens in PayPal, outside the agent: show it where the story needs it.
       const captured = d.status === 'awaiting_approval' && s.ledger.find(x => x.type === 'order.captured' && (x.data as any).orderId === d.orderId);
       if (captured) {
@@ -113,9 +142,9 @@ function AgentLog({ s }: { s: SessionState }) {
   return (
     <ul role="list" className="log" aria-live="polite">
       {lines.map(l => (
-        <li key={l.key} className="reveal">
+        <li key={l.key} className={l.wide ? 'reveal log-wide' : 'reveal'}>
           {l.sep && <span className="run-sep" aria-hidden="true" />}
-          <span className="who">{l.who}<span className="sr-only">: </span></span><span>{l.body}</span>
+          {l.wide ? l.body : <><span className="who">{l.who}<span className="sr-only">: </span></span><span>{l.body}</span></>}
         </li>
       ))}
     </ul>
