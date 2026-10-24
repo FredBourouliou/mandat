@@ -4,6 +4,25 @@ import { useCallback, useEffect, useState } from 'react';
 
 type Result = { valid: boolean; reason?: string; entries?: number; keyId?: string };
 
+/** The answer first, then the two checks behind it, then what a seal does not prove. */
+function Verdict({ r }: { r: Result }) {
+  const reason = r.reason ?? '';
+  const chainBroken = /^entry|^head/.test(reason);
+  const badSignature = reason.startsWith('signature');
+  return (
+    <section className={`notice reveal ${r.valid ? '' : 'notice-seal'}`} role="status" aria-labelledby="verdict-title">
+      <h2 id="verdict-title" className="h-sub">{r.valid ? 'Receipt intact' : 'Receipt rejected'}</h2>
+      {!r.valid && !chainBroken && !badSignature && <p>{reason}</p>}
+      <dl className="terms">
+        <dt>Hash chain</dt><dd>{r.valid ? <><span className="verdict verdict-allow">Intact</span> {r.entries} entries</> : chainBroken ? <span className="verdict verdict-deny">Broken</span> : badSignature ? <span className="verdict verdict-allow">Intact</span> : 'not checked'}</dd>
+        <dt>Signature</dt><dd>{r.valid ? <><span className="verdict verdict-allow">Valid</span> key <code>{r.keyId}</code></> : badSignature ? <span className="verdict verdict-deny">Does not match</span> : 'not checked'}</dd>
+      </dl>
+      {chainBroken && <p className="faint">{reason}.</p>}
+      <p className="faint">A valid seal proves the receipt was not altered since this Mandat deployment signed it. It does not prove that what it records is true on its own: PayPal's records of the same order (custom_id, capture, tracking) back that up.</p>
+    </section>
+  );
+}
+
 export function VerifyForm({ demoSession }: { demoSession: string }) {
   const fromRun = useSearchParams().get('session');
   const [text, setText] = useState('');
@@ -49,6 +68,7 @@ export function VerifyForm({ demoSession }: { demoSession: string }) {
           <button className="btn btn-quiet" onClick={() => load(fromRun || demoSession)}>Load the {fromRun ? "run's" : 'recorded demo'} receipt</button>
         </div>
       )}
+      {result && <Verdict r={result} />}
       <label>Receipt JSON
         <textarea value={text} onChange={e => edit(e.target.value)} rows={12} spellCheck={false} className="mono-area" placeholder='{"mandateHash": "…", "entries": [ … ], "signature": "…"}' />
       </label>
@@ -61,13 +81,6 @@ export function VerifyForm({ demoSession }: { demoSession: string }) {
         </label>
       </div>
       {note && <p className="faint">{note}</p>}
-      {result && (
-        <p className={`notice reveal ${result.valid ? '' : 'notice-seal'}`} role="status">
-          {result.valid
-            ? <><span className="verdict verdict-allow">Valid</span> {result.entries} entries, chain intact, signature by key <code>{result.keyId}</code>.</>
-            : <><span className="verdict verdict-deny">Invalid</span> {result.reason}</>}
-        </p>
-      )}
     </div>
   );
 }

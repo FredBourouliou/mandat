@@ -14,9 +14,9 @@ export function AccessForm() {
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
   return (
-    <section className="deed narrow">
-      <h2>Run it live</h2>
-      <p className="muted">Live runs call Claude and the PayPal sandbox, so they need the access code given to the judges. Without it, replay the recorded run above, or run the project locally from the README.</p>
+    <section className="deed" aria-labelledby="live-title">
+      <h2 id="live-title">Run it live</h2>
+      <p className="muted">For the judges: a new purchase with Claude and the PayPal sandbox. Needs the access code given with the submission. Anyone can also run the project locally from the README.</p>
       <form className="btn-row" onSubmit={async e => {
         e.preventDefault(); setError('');
         if (!code.trim()) { setError('Enter the access code.'); return; }
@@ -56,6 +56,11 @@ export function MandateForm() {
         <label>Purchases<input type="number" min={1} max={10} value={f.maxPurchases} onChange={num('maxPurchases')} /></label>
         <label>Valid for (days)<input type="number" min={1} max={30} value={f.days} onChange={num('days')} /></label>
       </div>
+      <p className="notice" aria-live="polite">
+        <strong>What you are signing:</strong> the agent can spend at most {f.maxTotal} EUR in total, on outdoor and travel items from Atelier Voyage, {Math.min(f.maxPerPurchase, f.maxTotal)} EUR per purchase,
+        in {f.maxPurchases} purchase{f.maxPurchases === 1 ? '' : 's'} or fewer, for {f.days} day{f.days === 1 ? '' : 's'}.
+        {f.approvalAbove > 0 ? ` Above ${f.approvalAbove} EUR, PayPal asks for your approval first.` : ' Every purchase goes to PayPal for your approval.'} Nothing else can be bought.
+      </p>
       <div className="btn-row">
         <button className="btn btn-seal" disabled={busy}>{busy ? 'Sealing…' : 'Sign and hand to the agent'}</button>
         <span className="faint">Sandbox only. Capped at 200 EUR.</span>
