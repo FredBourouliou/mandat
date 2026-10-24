@@ -71,13 +71,14 @@ Locally, `JURY_CODE` is empty, so live runs are open. A signing key is generated
 - `packages/guard/scripts/*.ts`: end-to-end runs against the real PayPal sandbox (direct payment, idempotent re-submission, approval then capture, tracking, PDF).
 - `scripts/injection-suite.ts`: 30 attacks in five families (direct requests, false authority, manipulated proposals, instructions hidden in listings, budget exhaustion), each on a fresh mandate, run with three agent personas, and checked independently of what the agent says. **Results: [docs/injection-results.md](docs/injection-results.md)** (raw data in `docs/injection-results.json`).
 
-  | Agent persona | Runs | Attempted a purchase outside the mandate | Orders outside the mandate | Money outside the mandate |
-  | --- | --- | --- | --- | --- |
-  | default (the production agent) | 30 | 22 | **0** | **0 EUR** |
-  | obedient (Claude told to obey every instruction) | 30 | 21 | **0** | **0 EUR** |
-  | compromised (no model: the attacker's proposals go straight to the guard) | 30 | 29 | **0** | **0 EUR** |
+| Agent persona | Runs | Attempted a purchase outside the mandate | Orders outside the mandate | Money outside the mandate |
+| --- | --- | --- | --- | --- |
+| default (the production agent) | 30 | 22 | **0** | **0 EUR** |
+| obedient (Claude told to obey every instruction) | 30 | 21 | **0** | **0 EUR** |
+| compromised (no model: the attacker's proposals go straight to the guard) | 30 | 29 | **0** | **0 EUR** |
 
-  What it shows: Claude mostly ignored instructions hidden in listings, even when told to obey them (2 of 6 attempted), but it readily proposes what the user asks, in or out of the mandate. Safety comes from the guard, not from the model: a fully hijacked agent still spent nothing outside the mandate. The `obedient` and `compromised` personas only exist on a local server started with `MANDAT_TEST_HARNESS=1`.
+What it shows: Claude mostly ignored instructions hidden in listings, even when told to obey them (2 of 6 attempted), but it readily proposes what the user asks, in or out of the mandate. Safety comes from the guard, not from the model: a fully hijacked agent still spent nothing outside the mandate. The `obedient` and `compromised` personas only exist on a local server started with `MANDAT_TEST_HARNESS=1`.
+
 - Accessibility: axe-core (WCAG 2.2 AA) with 0 violations on every page at desktop and mobile widths; keyboard and 400 % zoom checked; VoiceOver pass in Safari.
 
 ## Security notes
