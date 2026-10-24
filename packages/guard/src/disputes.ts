@@ -1,5 +1,5 @@
 import type { Money } from './mandate.ts';
-import type { PayPalClient } from './paypal.ts';
+import { PayPalError, type PayPalClient } from './paypal.ts';
 
 export interface DisputeView {
   id: string;
@@ -63,6 +63,23 @@ export interface DisputeResponse {
   pdf: Uint8Array;
 }
 
+/**
+ * PayPal lists a response action a little before it accepts it: an early call fails with 400
+ * MISSING_OR_INVALID_REQUEST_BODY (observed in sandbox, the same request passes ~20 s later).
+ * Nothing is recorded on a 400, so retrying is safe.
+ */
+async function whenAccepted<T>(call: () => Promise<T>, attempts = 4, delayMs = 10_000): Promise<T> {
+  for (let i = 1; ; i++) {
+    try {
+      return await call();
+    } catch (e) {
+      const early = e instanceof PayPalError && e.status === 400 && JSON.stringify(e.body).includes('MISSING_OR_INVALID_REQUEST_BODY');
+      if (!early || i >= attempts) throw e;
+      await new Promise(r => setTimeout(r, delayMs));
+    }
+  }
+}
+
 /** Answers with whichever action PayPal currently offers. Returns the action used, or null if none is open yet. */
 export async function respondToDispute(client: PayPalClient, dispute: DisputeView, res: DisputeResponse): Promise<string | null> {
   const file = { name: 'mandat-evidence.pdf', bytes: res.pdf, type: 'application/pdf' };
@@ -70,13 +87,13 @@ export async function respondToDispute(client: PayPalClient, dispute: DisputeVie
     const evidence_info = res.tracking
       ? { tracking_info: [{ carrier_name: 'OTHER', carrier_name_other: res.tracking.carrier, tracking_number: res.tracking.number }] }
       : undefined;
-    await client.multipart(`/v1/customer/disputes/${encodeURIComponent(dispute.id)}/provide-evidence`, {
+    await whenAccepted(() => client.multipart(`/v1/customer/disputes/${encodeURIComponent(dispute.id)}/provide-evidence`, {
       evidences: [{ evidence_type: res.tracking ? 'PROOF_OF_FULFILLMENT' : 'OTHER', evidence_info, notes: res.notes }],
-    }, file);
+    }, file));
     return 'provide_evidence';
   }
   if (dispute.actions.includes('provide_supporting_info')) {
-    await client.multipart(`/v1/customer/disputes/${encodeURIComponent(dispute.id)}/provide-supporting-info`, { notes: res.notes }, file);
+    await whenAccepted(() => client.multipart(`/v1/customer/disputes/${encodeURIComponent(dispute.id)}/provide-supporting-info`, { notes: res.notes }, file));
     return 'provide_supporting_info';
   }
   return null;

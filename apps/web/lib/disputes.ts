@@ -109,8 +109,7 @@ export async function submitResponse(id: string): Promise<{ action: string | nul
   const draft = JSON.parse(row.draft) as Draft;
   const tracked = guard.ledger.entries.find(e => e.type === 'shipment.tracked' && (e.data as { orderId?: string }).orderId === row.order_id)?.data as
     { carrier: string; trackingNumber: string } | undefined;
-  // PayPal rejects PDFs with embedded files, so this copy leaves receipt.json out.
-  const pdf = await receiptPdf({ receipt, mandate: guard.mandate, verifyUrl: `${PUBLIC_URL}/verify`, attachReceipt: false });
+  const pdf = await receiptPdf({ receipt, mandate: guard.mandate, verifyUrl: `${PUBLIC_URL}/verify` });
   const action = await respondToDispute(paypal(), view, {
     notes: draft.notes, pdf, tracking: tracked ? { carrier: tracked.carrier, number: tracked.trackingNumber } : undefined,
   });

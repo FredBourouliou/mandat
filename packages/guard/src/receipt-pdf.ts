@@ -7,8 +7,6 @@ export interface ReceiptPdfInput {
   mandate: Mandate;
   verifyUrl: string;
   title?: string;
-  /** Embed receipt.json in the PDF. PayPal's dispute upload rejects PDFs with embedded files, so evidence sent to PayPal leaves it out. */
-  attachReceipt?: boolean;
 }
 
 const INK = rgb(0.11, 0.13, 0.16);
@@ -18,7 +16,7 @@ const MUTED = rgb(0.38, 0.42, 0.47);
  * Human-readable evidence pack. The sealed receipt is embedded as a JSON attachment,
  * so anyone can check the signature without trusting this PDF's text.
  */
-export async function receiptPdf({ receipt, mandate, verifyUrl, title = 'Purchase mandate evidence', attachReceipt = true }: ReceiptPdfInput): Promise<Uint8Array> {
+export async function receiptPdf({ receipt, mandate, verifyUrl, title = 'Purchase mandate evidence' }: ReceiptPdfInput): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
   doc.setTitle(title);
   doc.setProducer('Mandat');
@@ -78,16 +76,12 @@ export async function receiptPdf({ receipt, mandate, verifyUrl, title = 'Purchas
   line(`Mandate hash (also stored by PayPal as the order custom_id): ${receipt.mandateHash}`, { size: 8, f: mono });
   line(`Head: ${receipt.head}`, { size: 8, f: mono });
   line(`Ed25519 signature (key ${receipt.keyId}): ${receipt.signature}`, { size: 7, f: mono, gap: 18 });
-  line(attachReceipt
-    ? `Verify: ${verifyUrl}  - the signed receipt is attached to this PDF as receipt.json.`
-    : `Verify: ${verifyUrl}  - the signed receipt (JSON) is available from the merchant and checks against the public key at /.well-known/mandat-keys.json.`, { color: MUTED });
+  line(`Verify: ${verifyUrl}  - the signed receipt is attached to this PDF as receipt.json.`, { color: MUTED });
 
-  if (attachReceipt) {
-    await doc.attach(new TextEncoder().encode(JSON.stringify(receipt, null, 2)), 'receipt.json', {
-      mimeType: 'application/json',
-      description: 'Sealed Mandat receipt (JCS + SHA-256 chain + Ed25519)',
-    });
-  }
+  await doc.attach(new TextEncoder().encode(JSON.stringify(receipt, null, 2)), 'receipt.json', {
+    mimeType: 'application/json',
+    description: 'Sealed Mandat receipt (JCS + SHA-256 chain + Ed25519)',
+  });
   return doc.save();
 }
 
