@@ -35,7 +35,7 @@ function DisputeCard({ d, live, onChange }: { d: Dispute; live: boolean; onChang
   return (
     <section className="deed reveal" aria-labelledby={`d-${d.id}`}>
       <div className="section-head">
-        <h3 id={`d-${d.id}`}>Dispute {d.id}</h3>
+        <h2 id={`d-${d.id}`} className="h-sub">Dispute {d.id}</h2>
         {d.simulatedOutcome
           ? <span className="verdict verdict-allow">Won (simulated)</span>
           : <span className={`verdict ${d.response ? 'verdict-neutral' : 'verdict-pending'}`}>{d.view?.status?.replaceAll('_', ' ') ?? 'Opening'}</span>}
@@ -57,7 +57,7 @@ function DisputeCard({ d, live, onChange }: { d: Dispute; live: boolean; onChang
           <span className="faint">Claude only sees the sealed ledger. You send.</span>
         </div>
       ) : (
-        <div className="stack">
+        <div className="stack measure">
           <p className="eyebrow">Draft by Claude · from the sealed receipt only</p>
           <p><strong>{d.draft.summary}</strong></p>
           <ul className="stack" style={{ gap: 'var(--space-2xs)', margin: 0, paddingLeft: '1.2em' }}>
@@ -101,7 +101,7 @@ export function MerchantView({ id }: { id: string }) {
   const tracking = (orderId: string) => s.ledger.find(e => e.type === 'shipment.tracked' && (e.data as any).orderId === orderId)?.data as any;
   return (
     <div className="stack-lg">
-      <section className="stack" style={{ maxWidth: '64ch' }}>
+      <section className="stack narrow">
         <h1>Atelier Voyage: orders placed by an AI agent</h1>
         <p className="lede">Each order carries the hash of the buyer's mandate. When a payment is disputed, the sealed receipt becomes the evidence.</p>
         <p className="faint"><Link href={`/s/${id}`}>Back to the buyer's view</Link></p>
@@ -121,9 +121,9 @@ export function MerchantView({ id }: { id: string }) {
                 <span className="seq">#{i + 1}</span>
                 <span className="what">
                   <span>{o.proposal.title} ×{o.proposal.quantity} · <strong>{money(o.amount)}</strong></span>
-                  <span className="faint">PayPal order <code>{o.orderId}</code> · custom_id <code title={s.mandateHash}>{short(s.mandateHash, 12)}</code>{t ? ` · ${t.carrier} ${t.trackingNumber}` : ''}</span>
+                  <span className="faint">PayPal order <code>{o.orderId}</code> · {o.mode === 'direct' ? 'card' : 'PayPal account'} · custom_id <code title={s.mandateHash}>{short(s.mandateHash, 12)}</code>{t ? ` · ${t.carrier} ${t.trackingNumber}` : ''}</span>
                 </span>
-                {disputed ? <span className="verdict verdict-pending">Disputed</span> : o.mode !== 'direct' ? <span className="faint">Paid with PayPal</span> : s.live && (
+                {disputed ? <span className="verdict verdict-pending">Disputed</span> : o.mode !== 'direct' ? <span className="faint">No chargeback (PayPal account)</span> : s.live && (
                   <button className="btn btn-quiet" disabled={Boolean(busy)} onClick={async () => {
                     setBusy(o.orderId); setErr('');
                     try { await post(`/api/sessions/${id}/disputes`, { orderId: o.orderId }); } catch (e) { setErr((e as Error).message); }

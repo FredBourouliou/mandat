@@ -14,7 +14,7 @@ export function AccessForm() {
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
   return (
-    <section className="deed" style={{ maxWidth: '62ch' }}>
+    <section className="deed narrow">
       <h2>Run it live</h2>
       <p className="muted">Live runs call Claude and the PayPal sandbox, so they need the access code given to the judges. Without it, replay the recorded run above, or run the project locally from the README.</p>
       <form className="btn-row" onSubmit={async e => {
@@ -36,7 +36,7 @@ export function MandateForm() {
   const [error, setError] = useState('');
   const num = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: Number(e.target.value) });
   return (
-    <form className="deed" style={{ maxWidth: '62ch' }} onSubmit={async e => {
+    <form className="deed narrow" onSubmit={async e => {
       e.preventDefault(); setBusy(true); setError('');
       try {
         const { id } = await post('/api/sessions', {

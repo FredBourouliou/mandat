@@ -95,6 +95,7 @@ function AgentLog({ s }: { s: SessionState }) {
     } else if (e.kind === 'done') lines.push({ key: e.seq, who: 'Agent', body: <span className="prose">{plain(d.text)}</span> });
     else if (e.kind === 'error') lines.push({ key: e.seq, who: 'Error', body: <span className="error">{d.message}</span> });
   }
+  if (s.running) lines.push({ key: -1, who: 'Agent', body: <span className="working">Searching the catalogue and proposing</span> });
   return (
     <ul className="log" aria-live="polite">
       {lines.map(l => (

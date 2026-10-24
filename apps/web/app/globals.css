@@ -87,8 +87,9 @@ main.shell { padding-block: var(--space-2xl) var(--space-4xl); }
 .lede { font-size: var(--text-lg); color: var(--ink-soft); max-width: 60ch; }
 .muted { color: var(--ink-soft); }
 .faint { color: var(--ink-faint); font-size: var(--text-sm); }
-.stack { display: grid; gap: var(--space-md); }
-.stack-lg { display: grid; gap: var(--space-xl); }
+.stack { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-md); }
+.stack-lg { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-xl); }
+.measure { max-width: 72ch; }
 
 /* Buttons */
 .btn {
@@ -99,7 +100,12 @@ main.shell { padding-block: var(--space-2xl) var(--space-4xl); }
   transition: background-color 160ms var(--ease), color 160ms var(--ease);
 }
 .btn:hover { background: var(--seal); border-color: var(--seal); }
+.btn:active:not(:disabled) { transform: translateY(1px); }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.narrow { max-width: 62ch; }
+.working { color: var(--ink-soft); }
+.working::after { content: '…'; animation: blink 1.2s steps(4, end) infinite; }
+@keyframes blink { 50% { opacity: 0.3; } }
 .btn-quiet { background: transparent; color: var(--ink); border-color: var(--rule-strong); }
 .btn-quiet:hover { background: var(--paper-sunk); color: var(--ink); border-color: var(--ink); }
 .btn-seal { background: var(--seal); border-color: var(--seal); }
@@ -118,7 +124,7 @@ input:focus, textarea:focus { border-color: var(--ink); outline: none; box-shado
 .error { color: var(--seal); font-size: var(--text-sm); }
 
 /* The deed: a document-like block with double rules */
-.deed { border-top: 3px double var(--ink); border-bottom: 1px solid var(--ink); padding-block: var(--space-lg); display: grid; gap: var(--space-md); }
+.deed { border-top: 3px double var(--ink); border-bottom: 1px solid var(--ink); padding-block: var(--space-lg); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-md); }
 .terms { display: grid; grid-template-columns: max-content 1fr; gap: var(--space-xs) var(--space-lg); margin: 0; font-size: var(--text-sm); }
 .terms dt { color: var(--ink-faint); }
 .terms dd { margin: 0; font-weight: 600; }
@@ -167,6 +173,7 @@ p.notice { display: block; }
 @media (prefers-reduced-motion: reduce) {
   .reveal { animation: none; }
   .btn { transition: none; }
+  .working::after { animation: none; }
 }
 
 /* Receipt first: a deed on guilloche, the way security paper protects a cheque's amount */
