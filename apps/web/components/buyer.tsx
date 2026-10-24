@@ -77,6 +77,8 @@ function AgentLog({ s }: { s: SessionState }) {
   let run = '';
   // Older runs log the proposal separately: pair them in order when the guard line does not carry the item.
   const pending: any[] = [];
+  // Approvals happen after the agent has finished its run: shown after its summary.
+  const later: typeof lines = [];
   for (const e of s.agent) {
     const d = e.data as any;
     const sep = e.runId !== run && run !== '';
@@ -96,13 +98,17 @@ function AgentLog({ s }: { s: SessionState }) {
       const captured = d.status === 'awaiting_approval' && s.ledger.find(x => x.type === 'order.captured' && (x.data as any).orderId === d.orderId);
       if (captured) {
         const c = captured.data as any;
-        lines.push({ key: e.seq + 0.5, who: 'You', body: c.status === 'COMPLETED'
+        later.push({ key: e.seq + 0.5, who: 'You', body: c.status === 'COMPLETED'
           ? <><span className="verdict verdict-allow">Paid</span> approved in PayPal at {time(captured.at)}<span className="block faint">Payer {c.payerId} · capture {c.captureId}</span></>
           : <><span className="verdict verdict-deny">Failed</span> capture {c.status}</> });
       }
-    } else if (e.kind === 'done') lines.push({ key: e.seq, who: 'Agent', body: <span className="prose">{plain(d.text)}</span> });
+    } else if (e.kind === 'done') {
+      lines.push({ key: e.seq, who: 'Agent', body: <span className="prose">{plain(d.text)}</span> });
+      lines.push(...later.splice(0));
+    }
     else if (e.kind === 'error') lines.push({ key: e.seq, who: 'Error', body: <span className="error">{d.message}</span> });
   }
+  lines.push(...later);
   if (s.running) lines.push({ key: -1, who: 'Agent', body: <span className="working">Searching the catalogue and proposing</span> });
   return (
     <ul className="log" aria-live="polite">
