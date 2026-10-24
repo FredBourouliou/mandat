@@ -19,14 +19,14 @@ export function createSession(mandate: Omit<Mandate, 'id'>): string {
   const id = newId('s');
   const full: Mandate = { ...mandate, id: newId('mdt') };
   const guard = new Guard(full, railFor(id));
-  db.prepare('INSERT INTO sessions (id, created_at, mandate, ledger) VALUES (?, ?, ?, ?)')
+  db().prepare('INSERT INTO sessions (id, created_at, mandate, ledger) VALUES (?, ?, ?, ?)')
     .run(id, new Date().toISOString(), JSON.stringify(full), JSON.stringify(guard.ledger.entries));
   guards.set(id, guard);
   return id;
 }
 
 export function getSession(id: string): SessionRow | undefined {
-  return db.prepare('SELECT * FROM sessions WHERE id = ?').get(id) as SessionRow | undefined;
+  return db().prepare('SELECT * FROM sessions WHERE id = ?').get(id) as SessionRow | undefined;
 }
 
 /** One live guard per session; rebuilt from the stored ledger after a restart. */
@@ -41,18 +41,18 @@ export function guardFor(id: string): Guard | undefined {
 }
 
 export function saveLedger(id: string, guard: Guard): void {
-  db.prepare('UPDATE sessions SET ledger = ? WHERE id = ?').run(JSON.stringify(guard.ledger.entries), id);
+  db().prepare('UPDATE sessions SET ledger = ? WHERE id = ?').run(JSON.stringify(guard.ledger.entries), id);
 }
 
 export interface AgentEvent { seq: number; runId: string; at: string; kind: string; data: unknown }
 
 export function logAgent(sessionId: string, runId: string, kind: string, data: unknown): void {
-  const next = (db.prepare('SELECT COALESCE(MAX(seq), -1) + 1 AS n FROM agent_events WHERE session_id = ?').get(sessionId) as { n: number }).n;
-  db.prepare('INSERT INTO agent_events (session_id, seq, run_id, at, kind, data) VALUES (?, ?, ?, ?, ?, ?)')
+  const next = (db().prepare('SELECT COALESCE(MAX(seq), -1) + 1 AS n FROM agent_events WHERE session_id = ?').get(sessionId) as { n: number }).n;
+  db().prepare('INSERT INTO agent_events (session_id, seq, run_id, at, kind, data) VALUES (?, ?, ?, ?, ?, ?)')
     .run(sessionId, next, runId, new Date().toISOString(), kind, JSON.stringify(data));
 }
 
 export function agentEvents(sessionId: string): AgentEvent[] {
-  return (db.prepare('SELECT seq, run_id, at, kind, data FROM agent_events WHERE session_id = ? ORDER BY seq').all(sessionId) as any[])
+  return (db().prepare('SELECT seq, run_id, at, kind, data FROM agent_events WHERE session_id = ? ORDER BY seq').all(sessionId) as any[])
     .map(r => ({ seq: r.seq, runId: r.run_id, at: r.at, kind: r.kind, data: JSON.parse(r.data) }));
 }

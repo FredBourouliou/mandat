@@ -10,8 +10,8 @@ function required(name: string): string {
   return v;
 }
 
+/** Persistent data directory (a mounted disk in production, which only exists at runtime, not during the build). */
 export const DATA_DIR = process.env.DATA_DIR ?? join(process.cwd(), '.data');
-mkdirSync(DATA_DIR, { recursive: true });
 
 export const PUBLIC_URL = (process.env.PUBLIC_URL ?? 'http://localhost:3000').replace(/\/$/, '');
 export const JURY_CODE = process.env.JURY_CODE ?? '';
@@ -31,6 +31,7 @@ export function signingKey(): SigningKey {
   const keyId = process.env.SIGNING_KEY_ID ?? 'mandat-dev';
   let pem = process.env.SIGNING_KEY_PEM?.replace(/\\n/g, '\n');
   if (!pem) {
+    mkdirSync(DATA_DIR, { recursive: true });
     const file = join(DATA_DIR, 'signing-key.pem');
     if (!existsSync(file)) {
       const { privateKey } = generateKeyPairSync('ed25519');

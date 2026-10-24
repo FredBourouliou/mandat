@@ -20,10 +20,10 @@ export async function POST(req: Request) {
   if (!verified) return NextResponse.json({ error: 'signature' }, { status: 401 });
 
   const disputeId: string | undefined = event.resource?.dispute_id;
-  const inserted = db.prepare('INSERT OR IGNORE INTO webhook_events (id, type, resource_id, received_at, verified, body) VALUES (?, ?, ?, ?, 1, ?)')
+  const inserted = db().prepare('INSERT OR IGNORE INTO webhook_events (id, type, resource_id, received_at, verified, body) VALUES (?, ?, ?, ?, 1, ?)')
     .run(event.id, event.event_type, disputeId ?? event.resource?.id ?? null, new Date().toISOString(), raw).changes;
   if (inserted && disputeId && String(event.event_type).startsWith('CUSTOMER.DISPUTE.')) {
-    db.prepare('UPDATE disputes SET first_webhook_at = COALESCE(first_webhook_at, ?) WHERE id = ?').run(new Date().toISOString(), disputeId);
+    db().prepare('UPDATE disputes SET first_webhook_at = COALESCE(first_webhook_at, ?) WHERE id = ?').run(new Date().toISOString(), disputeId);
     void refreshDispute(disputeId);
   }
   return NextResponse.json({ ok: true });

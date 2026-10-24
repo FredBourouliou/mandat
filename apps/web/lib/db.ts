@@ -1,13 +1,23 @@
 import 'server-only';
 import Database from 'better-sqlite3';
+import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { DATA_DIR } from './env';
 
-export const db = new Database(join(DATA_DIR, 'mandat.db'));
-db.pragma('journal_mode = WAL');
-db.pragma('foreign_keys = ON');
+let handle: Database.Database | undefined;
 
-db.exec(`
+/** Opened on first use, so building the app never touches the data disk. */
+export function db(): Database.Database {
+  if (handle) return handle;
+  mkdirSync(DATA_DIR, { recursive: true });
+  const d = new Database(join(DATA_DIR, 'mandat.db'));
+  d.pragma('journal_mode = WAL');
+  d.pragma('foreign_keys = ON');
+  d.exec(SCHEMA);
+  return (handle = d);
+}
+
+const SCHEMA = `
 CREATE TABLE IF NOT EXISTS sessions (
   id TEXT PRIMARY KEY,
   created_at TEXT NOT NULL,
@@ -49,13 +59,13 @@ CREATE TABLE IF NOT EXISTS usage (
   count INTEGER NOT NULL,
   PRIMARY KEY (key, day)
 );
-`);
+`;
 
 /** Counts one use of `key` today and reports whether it stays within `limit`. */
 export function consume(key: string, limit: number): boolean {
   const day = new Date().toISOString().slice(0, 10);
-  const row = db.prepare('SELECT count FROM usage WHERE key = ? AND day = ?').get(key, day) as { count: number } | undefined;
+  const row = db().prepare('SELECT count FROM usage WHERE key = ? AND day = ?').get(key, day) as { count: number } | undefined;
   if ((row?.count ?? 0) >= limit) return false;
-  db.prepare('INSERT INTO usage (key, day, count) VALUES (?, ?, 1) ON CONFLICT(key, day) DO UPDATE SET count = count + 1').run(key, day);
+  db().prepare('INSERT INTO usage (key, day, count) VALUES (?, ?, 1) ON CONFLICT(key, day) DO UPDATE SET count = count + 1').run(key, day);
   return true;
 }

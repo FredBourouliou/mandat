@@ -17,18 +17,18 @@ export interface DisputeRow {
 export const DRAFT_MODEL = 'claude-sonnet-5-5';
 
 export function disputesFor(sessionId: string): DisputeRow[] {
-  return db.prepare('SELECT * FROM disputes WHERE session_id = ? ORDER BY created_at').all(sessionId) as DisputeRow[];
+  return db().prepare('SELECT * FROM disputes WHERE session_id = ? ORDER BY created_at').all(sessionId) as DisputeRow[];
 }
 
 const DISPUTE_ID = /^PP-[A-Z0-9-]{4,40}$/;
 
 /** Only disputes this app opened can be acted on. */
 export function knownDispute(id: string): boolean {
-  return DISPUTE_ID.test(id) && Boolean(db.prepare('SELECT 1 FROM disputes WHERE id = ?').get(id));
+  return DISPUTE_ID.test(id) && Boolean(db().prepare('SELECT 1 FROM disputes WHERE id = ?').get(id));
 }
 
 function dispute(id: string): DisputeRow {
-  const row = db.prepare('SELECT * FROM disputes WHERE id = ?').get(id) as DisputeRow | undefined;
+  const row = db().prepare('SELECT * FROM disputes WHERE id = ?').get(id) as DisputeRow | undefined;
   if (!row) throw new Error('unknown dispute');
   return row;
 }
@@ -38,10 +38,10 @@ export async function openDispute(sessionId: string, orderId: string): Promise<s
   const guard = guardFor(sessionId);
   const order = guard?.orders.find(o => o.orderId === orderId && o.state === 'paid' && o.captureId);
   if (!order?.captureId) throw new Error('order is not paid');
-  const existing = db.prepare('SELECT id FROM disputes WHERE order_id = ?').get(orderId) as { id: string } | undefined;
+  const existing = db().prepare('SELECT id FROM disputes WHERE order_id = ?').get(orderId) as { id: string } | undefined;
   if (existing) return existing.id;
   const id = await simulateChargeback(paypal(), order.captureId, order.amount);
-  db.prepare('INSERT INTO disputes (id, session_id, order_id, capture_id, created_at) VALUES (?, ?, ?, ?, ?)')
+  db().prepare('INSERT INTO disputes (id, session_id, order_id, capture_id, created_at) VALUES (?, ?, ?, ?, ?)')
     .run(id, sessionId, orderId, order.captureId, new Date().toISOString());
   return id;
 }
@@ -51,7 +51,7 @@ export async function refreshDispute(id: string): Promise<DisputeView | null> {
   if (!knownDispute(id)) return null;
   try {
     const view = await getDispute(paypal(), id);
-    db.prepare('UPDATE disputes SET view = ? WHERE id = ?').run(JSON.stringify(view), id);
+    db().prepare('UPDATE disputes SET view = ? WHERE id = ?').run(JSON.stringify(view), id);
     return view;
   } catch {
     return null;
@@ -94,7 +94,7 @@ Mandate hash (stored by PayPal as the order custom_id): ${guard.hash}. Receipt s
 Ledger:
 ${entries}`,
   });
-  db.prepare('UPDATE disputes SET draft = ? WHERE id = ?').run(JSON.stringify(output), id);
+  db().prepare('UPDATE disputes SET draft = ? WHERE id = ?').run(JSON.stringify(output), id);
   return output;
 }
 
@@ -115,7 +115,7 @@ export async function submitResponse(id: string): Promise<{ action: string | nul
     notes: draft.notes, pdf, tracking: tracked ? { carrier: tracked.carrier, number: tracked.trackingNumber } : undefined,
   });
   if (action) {
-    db.prepare('UPDATE disputes SET response = ? WHERE id = ?').run(JSON.stringify({ action, at: new Date().toISOString(), head: receipt.head }), id);
+    db().prepare('UPDATE disputes SET response = ? WHERE id = ?').run(JSON.stringify({ action, at: new Date().toISOString(), head: receipt.head }), id);
     await refreshDispute(id);
   }
   return { action };
@@ -125,5 +125,5 @@ export async function submitResponse(id: string): Promise<{ action: string | nul
 export function simulateOutcome(id: string): void {
   const row = dispute(id);
   if (!row.response) throw new Error('respond first');
-  db.prepare('UPDATE disputes SET simulated_outcome = ? WHERE id = ?').run('RESOLVED_SELLER_FAVOUR', id);
+  db().prepare('UPDATE disputes SET simulated_outcome = ? WHERE id = ?').run('RESOLVED_SELLER_FAVOUR', id);
 }
