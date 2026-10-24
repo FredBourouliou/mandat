@@ -1,0 +1,9 @@
+{
+  "name": "mandat",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.5.2",
+  "scripts": {
+    "test": "pnpm -r test"
+  }
+}

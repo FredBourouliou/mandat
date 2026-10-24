@@ -1,0 +1,7 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+# Supply-chain hygiene: only install versions published at least 14 days ago.
+minimumReleaseAge: 20160
+onlyBuiltDependencies:
+  - better-sqlite3
