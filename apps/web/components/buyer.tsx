@@ -89,18 +89,18 @@ function AgentLog({ s }: { s: SessionState }) {
       const proposal = d.title ? d : pending.shift();
       if (d.title) pending.shift();
       const what = proposal ? <>{proposal.title} ×{proposal.quantity}, {proposal.unitPrice}{proposal.merchant !== 'atelier-voyage' ? <span className="faint"> · sold by {proposal.merchant}</span> : null}</> : null;
-      const verdict = d.status === 'denied' ? <><span className="verdict verdict-deny">Blocked</span> {what}<span className="block faint">{d.reasons.join('; ')}</span></>
-        : d.status === 'paid' ? <><span className="verdict verdict-allow">Paid</span> {what}</>
-        : d.status === 'awaiting_approval' ? <><span className="verdict verdict-pending">Approval</span> {what}<span className="block faint">Above the approval threshold: PayPal asks the buyer.</span></>
-        : <><span className="verdict verdict-deny">Failed</span> {what}<span className="block faint">{d.reason}</span></>;
+      const verdict = d.status === 'denied' ? <><span className="verdict verdict-deny">Blocked</span><span className="sr-only">: </span> {what}<span className="block faint">{d.reasons.join('; ')}</span></>
+        : d.status === 'paid' ? <><span className="verdict verdict-allow">Paid</span><span className="sr-only">: </span> {what}</>
+        : d.status === 'awaiting_approval' ? <><span className="verdict verdict-pending">Approval</span><span className="sr-only">: </span> {what}<span className="block faint">Above the approval threshold: PayPal asks the buyer.</span></>
+        : <><span className="verdict verdict-deny">Failed</span><span className="sr-only">: </span> {what}<span className="block faint">{d.reason}</span></>;
       lines.push({ key: e.seq, who: 'Guard', body: verdict });
       // The human step happens in PayPal, outside the agent: show it where the story needs it.
       const captured = d.status === 'awaiting_approval' && s.ledger.find(x => x.type === 'order.captured' && (x.data as any).orderId === d.orderId);
       if (captured) {
         const c = captured.data as any;
         later.push({ key: e.seq + 0.5, who: 'You', body: c.status === 'COMPLETED'
-          ? <><span className="verdict verdict-allow">Paid</span> approved in PayPal at {time(captured.at)}<span className="block faint">Payer {c.payerId} · capture {c.captureId}</span></>
-          : <><span className="verdict verdict-deny">Failed</span> capture {c.status}</> });
+          ? <><span className="verdict verdict-allow">Paid</span><span className="sr-only">: </span> approved in PayPal at {time(captured.at)}<span className="block faint">Payer {c.payerId} · capture {c.captureId}</span></>
+          : <><span className="verdict verdict-deny">Failed</span><span className="sr-only">: </span> capture {c.status}</> });
       }
     } else if (e.kind === 'done') {
       lines.push({ key: e.seq, who: 'Agent', body: <span className="prose">{plain(d.text)}</span> });
@@ -115,7 +115,7 @@ function AgentLog({ s }: { s: SessionState }) {
       {lines.map(l => (
         <li key={l.key} className="reveal">
           {l.sep && <span className="run-sep" aria-hidden="true" />}
-          <span className="who">{l.who}</span><span>{l.body}</span>
+          <span className="who">{l.who}<span className="sr-only">: </span></span><span>{l.body}</span>
         </li>
       ))}
     </ul>
@@ -135,13 +135,13 @@ function TaskBox({ s, onRun }: { s: SessionState; onRun: () => void }) {
   return (
     <div className="stack">
       <div className="btn-row" role="group" aria-label="Example tasks">
-        {SCENARIOS.map(x => <button key={x.label} className="btn btn-quiet" disabled={s.running} onClick={() => run(x.task)}>{x.label}</button>)}
+        {SCENARIOS.map(x => <button key={x.label} className="btn btn-quiet" aria-disabled={s.running} onClick={() => { if (!s.running) void run(x.task); }}>{x.label}</button>)}
       </div>
-      <form className="btn-row" onSubmit={e => { e.preventDefault(); if (task.trim()) run(task.trim()); }}>
+      <form className="btn-row" onSubmit={e => { e.preventDefault(); if (task.trim() && !s.running) void run(task.trim()); }}>
         <label style={{ flex: '1 1 320px' }}>Or write a task
-          <input value={task} onChange={e => setTask(e.target.value)} maxLength={300} placeholder="e.g. Find me packing cubes and a travel adapter" disabled={s.running} />
+          <input value={task} onChange={e => setTask(e.target.value)} maxLength={300} placeholder="e.g. Find me packing cubes and a travel adapter" readOnly={s.running} />
         </label>
-        <button className="btn" style={{ alignSelf: 'end' }} disabled={s.running || !task.trim()}>{s.running ? 'Agent working…' : 'Send to agent'}</button>
+        <button className="btn" style={{ alignSelf: 'end' }} aria-disabled={s.running || !task.trim()}>{s.running ? 'Agent working…' : 'Send to agent'}</button>
       </form>
       {error && <p className="error" role="alert">{error}</p>}
     </div>

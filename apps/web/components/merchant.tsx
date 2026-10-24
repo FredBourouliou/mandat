@@ -20,6 +20,7 @@ function DisputeCard({ d, live, onChange }: { d: Dispute; live: boolean; onChang
   const [error, setError] = useState('');
   const elapsed = useElapsed(d.createdAt);
   const act = async (action: string) => {
+    if (busy || (action === 'submit' && !ready)) return;
     setBusy(action); setError('');
     try { await post(`/api/disputes/${d.id}/${action}`); } catch (e) { setError((e as Error).message); }
     setBusy(''); onChange();
@@ -53,7 +54,7 @@ function DisputeCard({ d, live, onChange }: { d: Dispute; live: boolean; onChang
 
       {!d.draft ? (live &&
         <div className="btn-row">
-          <button className="btn" onClick={() => act('draft')} disabled={Boolean(busy)}>{busy === 'draft' ? 'Claude is reading the receipt…' : 'Draft the response from the receipt'}</button>
+          <button className="btn" onClick={() => act('draft')} aria-disabled={Boolean(busy)}>{busy === 'draft' ? 'Claude is reading the receipt…' : 'Draft the response from the receipt'}</button>
           <span className="faint">Claude only sees the sealed ledger. You send.</span>
         </div>
       ) : (
@@ -69,7 +70,7 @@ function DisputeCard({ d, live, onChange }: { d: Dispute; live: boolean; onChang
           </details>
           {!d.response ? (live &&
             <div className="btn-row">
-              <button className="btn btn-seal" onClick={() => act('submit')} disabled={Boolean(busy) || !ready}>{busy === 'submit' ? 'Sending…' : 'Send evidence to PayPal'}</button>
+              <button className="btn btn-seal" onClick={() => act('submit')} aria-disabled={Boolean(busy) || !ready}>{busy === 'submit' ? 'Sending…' : 'Send evidence to PayPal'}</button>
               <span className="faint">{ready ? 'Note, tracking and PDF evidence pack (with the signed receipt attached).' : 'Available once PayPal opens the response window.'}</span>
             </div>
           ) : (
@@ -82,7 +83,7 @@ function DisputeCard({ d, live, onChange }: { d: Dispute; live: boolean; onChang
         <div className="notice notice-seal">
           <p className="eyebrow">Simulated step</p>
           <p className="muted">The PayPal sandbox cannot rule on chargebacks, so the review stops here for real. The decision below is simulated and labelled as such.</p>
-          <div className="btn-row"><button className="btn btn-quiet" onClick={() => act('outcome')} disabled={Boolean(busy)}>Simulate PayPal's decision</button></div>
+          <div className="btn-row"><button className="btn btn-quiet" onClick={() => act('outcome')} aria-disabled={Boolean(busy)}>Simulate PayPal's decision</button></div>
         </div>
       )}
       {d.simulatedOutcome && <p className="notice reveal" role="status"><span className="verdict verdict-allow">Simulated</span> PayPal's decision is simulated (the sandbox cannot rule on chargebacks): resolved in the seller's favour: the evidence showed a purchase made within the buyer's mandate and shipped with tracking.</p>}
@@ -124,7 +125,8 @@ export function MerchantView({ id }: { id: string }) {
                   <span className="faint">PayPal order <code>{o.orderId}</code> · {o.mode === 'direct' ? 'card' : 'PayPal account'} · custom_id <code title={s.mandateHash}>{short(s.mandateHash, 12)}</code>{t ? ` · ${t.carrier} ${t.trackingNumber}` : ''}</span>
                 </span>
                 {disputed ? <span className="verdict verdict-pending">Disputed</span> : o.mode !== 'direct' ? <span className="faint">No chargeback (PayPal account)</span> : s.live && (
-                  <button className="btn btn-quiet" disabled={Boolean(busy)} onClick={async () => {
+                  <button className="btn btn-quiet" aria-disabled={Boolean(busy)} onClick={async () => {
+                    if (busy) return;
                     setBusy(o.orderId); setErr('');
                     try { await post(`/api/sessions/${id}/disputes`, { orderId: o.orderId }); } catch (e) { setErr((e as Error).message); }
                     setBusy(''); reload();
