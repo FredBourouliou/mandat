@@ -15,6 +15,8 @@ export const DATA_DIR = process.env.DATA_DIR ?? join(process.cwd(), '.data');
 
 export const PUBLIC_URL = (process.env.PUBLIC_URL ?? 'http://localhost:3000').replace(/\/$/, '');
 export const JURY_CODE = process.env.JURY_CODE ?? '';
+/** A recorded session that visitors without the access code can replay, read-only. */
+export const DEMO_SESSION_ID = process.env.DEMO_SESSION_ID ?? '';
 export const PAYPAL_WEBHOOK_ID = process.env.PAYPAL_WEBHOOK_ID ?? '';
 
 export const paypalCredentials = () => ({ clientId: required('PAYPAL_CLIENT_ID'), clientSecret: required('PAYPAL_CLIENT_SECRET') });

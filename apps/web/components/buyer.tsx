@@ -132,10 +132,12 @@ function Approvals({ s }: { s: SessionState }) {
         <section key={o.orderId} className="notice notice-pending reveal" aria-live="polite">
           <p className="eyebrow">Your approval is needed</p>
           <p><strong>{o.proposal.title} ×{o.proposal.quantity}, {money(o.amount)}</strong>, above your {money(s.mandate.approvalAbove)} threshold.</p>
-          <div className="btn-row">
-            <a className="btn" href={o.approveUrl}>Review and approve in PayPal</a>
-            <span className="faint">PayPal sandbox order {o.orderId}. You come back here once approved.</span>
-          </div>
+          {s.live ? (
+            <div className="btn-row">
+              <a className="btn" href={o.approveUrl}>Review and approve in PayPal</a>
+              <span className="faint">PayPal sandbox order {o.orderId}. You come back here once approved.</span>
+            </div>
+          ) : <p className="faint">PayPal sandbox order {o.orderId}. Approval needs the access code.</p>}
         </section>
       ))}
     </>
@@ -160,6 +162,14 @@ function Receipt({ s }: { s: SessionState }) {
   );
 }
 
+export function ReplayBanner() {
+  return (
+    <p className="notice reveal" role="status">
+      <span className="verdict verdict-neutral">Replay</span> A recorded run, shown read-only: every line below happened on the PayPal sandbox. Live runs need the judges' access code.
+    </p>
+  );
+}
+
 export function BuyerView({ id }: { id: string }) {
   const { state: s, error, reload } = useSession<SessionState>(id, x => x.orders.some(o => o.state === 'awaiting_approval'));
   const approval = useSearchParams().get('approval');
@@ -172,12 +182,15 @@ export function BuyerView({ id }: { id: string }) {
         <p className="faint">Merchant view: <Link href={`/s/${id}/merchant`}>Atelier Voyage dashboard</Link></p>
       </aside>
       <div className="stack-lg">
+        {!s.live && <ReplayBanner />}
         {approval === 'captured' && <p className="notice reveal" role="status">PayPal confirmed your approval. The guard captured the payment once and Atelier Voyage shipped the order.</p>}
         {approval === 'cancelled' && <p className="notice reveal" role="status">You cancelled in PayPal. Nothing was charged.</p>}
-        <section className="stack">
-          <div className="section-head"><h2>Ask the agent</h2><span className="faint">Claude Sonnet 5.5 · proposes only</span></div>
-          <TaskBox s={s} onRun={reload} />
-        </section>
+        {s.live && (
+          <section className="stack">
+            <div className="section-head"><h2>Ask the agent</h2><span className="faint">Claude Sonnet 5.5 · proposes only</span></div>
+            <TaskBox s={s} onRun={reload} />
+          </section>
+        )}
         <Approvals s={s} />
         <section className="stack">
           <h3>What happened</h3>

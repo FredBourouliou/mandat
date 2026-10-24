@@ -31,4 +31,5 @@ export function sessionState(id: string) {
     })),
   };
 }
-export type SessionState = NonNullable<ReturnType<typeof sessionState>>;
+/** As served to the page: `live` says whether this browser may act (jury access code) or only replay. */
+export type SessionState = NonNullable<ReturnType<typeof sessionState>> & { live: boolean };

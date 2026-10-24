@@ -1,4 +1,6 @@
+import Link from 'next/link';
 import { hasLiveAccess } from '@/lib/access';
+import { DEMO_SESSION_ID } from '@/lib/env';
 import { AccessForm, MandateForm } from '@/components/start';
 
 // Access depends on the request cookie, never on build-time state.
@@ -22,7 +24,18 @@ export default async function Home() {
         <li><span className="seq">3</span><span className="what"><strong>You approve</strong><span className="faint">Above your threshold, PayPal asks you directly.</span></span><span className="verdict verdict-neutral">You</span></li>
         <li><span className="seq">4</span><span className="what"><strong>PayPal records</strong><span className="faint">The mandate hash travels with the order as its custom_id.</span></span><span className="verdict verdict-neutral">PayPal</span></li>
       </ol>
-      {live ? <MandateForm /> : <AccessForm />}
+      {live ? <MandateForm /> : (
+        <>
+          {DEMO_SESSION_ID && (
+            <section className="stack" style={{ maxWidth: '62ch' }}>
+              <h2>Replay a recorded run</h2>
+              <p className="muted">A complete run recorded on this deployment: real PayPal sandbox orders, a blocked injection, a human approval, a chargeback and the evidence sent. Read-only.</p>
+              <p><Link className="btn" href={`/s/${DEMO_SESSION_ID}`}>Open the recorded run</Link></p>
+            </section>
+          )}
+          <AccessForm />
+        </>
+      )}
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import type { SessionState } from '@/lib/state';
 import { money, short, time } from './format';
 import { post, useSession } from './use-session';
+import { ReplayBanner } from './buyer';
 
 type Dispute = SessionState['disputes'][number];
 
@@ -14,7 +15,7 @@ function useElapsed(since: string) {
   return `${Math.floor(s / 60)} min ${String(s % 60).padStart(2, '0')} s`;
 }
 
-function DisputeCard({ d, onChange }: { d: Dispute; onChange: () => void }) {
+function DisputeCard({ d, live, onChange }: { d: Dispute; live: boolean; onChange: () => void }) {
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
   const elapsed = useElapsed(d.createdAt);
@@ -26,10 +27,10 @@ function DisputeCard({ d, onChange }: { d: Dispute; onChange: () => void }) {
   // Until PayPal indexes the dispute and opens a response action, keep asking it.
   const ready = Boolean(d.view?.actions?.some((a: string) => a === 'provide_evidence' || a === 'provide_supporting_info'));
   useEffect(() => {
-    if (d.response || ready) return;
+    if (!live || d.response || ready) return;
     const t = setInterval(() => { void post(`/api/disputes/${d.id}/refresh`).then(onChange, () => undefined); }, 15000);
     return () => clearInterval(t);
-  }, [d.id, d.response, ready, onChange]);
+  }, [d.id, d.response, ready, live, onChange]);
 
   return (
     <section className="deed reveal" aria-labelledby={`d-${d.id}`}>
@@ -46,11 +47,11 @@ function DisputeCard({ d, onChange }: { d: Dispute; onChange: () => void }) {
         {d.view?.actions?.length ? <><dt>PayPal allows</dt><dd>{d.view.actions.join(', ').replaceAll('_', ' ')}</dd></> : null}
       </dl>
 
-      {!ready && !d.response && (
+      {live && !ready && !d.response && (
         <p className="notice notice-pending" role="status">PayPal is finalising the dispute ({elapsed} so far, usually about 3 minutes). You can draft the response now.</p>
       )}
 
-      {!d.draft ? (
+      {!d.draft ? (live &&
         <div className="btn-row">
           <button className="btn" onClick={() => act('draft')} disabled={Boolean(busy)}>{busy === 'draft' ? 'Claude is reading the receipt…' : 'Draft the response from the receipt'}</button>
           <span className="faint">Claude only sees the sealed ledger. You send.</span>
@@ -66,7 +67,7 @@ function DisputeCard({ d, onChange }: { d: Dispute; onChange: () => void }) {
             <summary className="faint">Note sent to PayPal ({d.draft.notes.length} characters)</summary>
             <p className="muted" style={{ whiteSpace: 'pre-wrap', marginTop: 'var(--space-xs)' }}>{d.draft.notes}</p>
           </details>
-          {!d.response ? (
+          {!d.response ? (live &&
             <div className="btn-row">
               <button className="btn btn-seal" onClick={() => act('submit')} disabled={Boolean(busy) || !ready}>{busy === 'submit' ? 'Sending…' : 'Send evidence to PayPal'}</button>
               <span className="faint">{ready ? 'Note, tracking and PDF evidence pack (with the signed receipt attached).' : 'Available once PayPal opens the response window.'}</span>
@@ -77,14 +78,14 @@ function DisputeCard({ d, onChange }: { d: Dispute; onChange: () => void }) {
         </div>
       )}
 
-      {d.response && !d.simulatedOutcome && (
+      {live && d.response && !d.simulatedOutcome && (
         <div className="notice notice-seal">
           <p className="eyebrow">Simulated step</p>
           <p className="muted">The PayPal sandbox cannot rule on chargebacks, so the review stops here for real. The decision below is simulated and labelled as such.</p>
           <div className="btn-row"><button className="btn btn-quiet" onClick={() => act('outcome')} disabled={Boolean(busy)}>Simulate PayPal's decision</button></div>
         </div>
       )}
-      {d.simulatedOutcome && <p className="notice reveal" role="status"><span className="verdict verdict-allow">Simulated</span> Resolved in the seller's favour: the evidence showed a mandate-bound, approved and shipped purchase.</p>}
+      {d.simulatedOutcome && <p className="notice reveal" role="status"><span className="verdict verdict-allow">Simulated</span> PayPal's decision is simulated (the sandbox cannot rule on chargebacks): resolved in the seller's favour: the evidence showed a mandate-bound, approved and shipped purchase.</p>}
       {error && <p className="error" role="alert">{error}</p>}
     </section>
   );
@@ -106,6 +107,7 @@ export function MerchantView({ id }: { id: string }) {
         <p className="lede">Each order carries the hash of the buyer's mandate. If the payment is disputed, the sealed receipt becomes the evidence.</p>
         <p className="faint"><Link href={`/s/${id}`}>Back to the buyer's view</Link></p>
       </section>
+      {!s.live && <ReplayBanner />}
       {!paid.length && <p className="notice">No paid orders yet. Run the agent from the buyer's view first.</p>}
       {paid.length > 0 && (
         <ol className="ledger" aria-label="Paid orders">
@@ -119,7 +121,7 @@ export function MerchantView({ id }: { id: string }) {
                   <span>{o.proposal.title} ×{o.proposal.quantity}</span>
                   <span className="faint">PayPal order <code>{o.orderId}</code> · custom_id <code title={s.mandateHash}>{short(s.mandateHash, 12)}</code>{t ? ` · ${t.carrier} ${t.trackingNumber}` : ''}</span>
                 </span>
-                {disputed ? <span className="verdict verdict-pending">Disputed</span> : (
+                {disputed ? <span className="verdict verdict-pending">Disputed</span> : s.live && (
                   <button className="btn btn-quiet" disabled={Boolean(busy)} onClick={async () => {
                     setBusy(o.orderId); setErr('');
                     try { await post(`/api/sessions/${id}/disputes`, { orderId: o.orderId }); } catch (e) { setErr((e as Error).message); }
@@ -132,7 +134,7 @@ export function MerchantView({ id }: { id: string }) {
         </ol>
       )}
       {err && <p className="error" role="alert">{err}</p>}
-      {s.disputes.map(d => <DisputeCard key={d.id} d={d} onChange={reload} />)}
+      {s.disputes.map(d => <DisputeCard key={d.id} d={d} live={s.live} onChange={reload} />)}
     </div>
   );
 }
