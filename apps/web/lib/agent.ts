@@ -30,32 +30,24 @@ export type Persona = 'default' | 'obedient' | 'compromised';
 export interface ScriptedProposal { sku: string; quantity: number }
 
 /**
- * `compromised` is not a model: it sends the attacker's proposals straight to the guard, the worst case of a fully
- * hijacked agent. Like `obedient`, it is honoured only with MANDAT_TEST_HARNESS=1.
+ * The only path to money, shared by the built-in agent (every persona) and external agents over MCP:
+ * the proposal is built from the catalogue (price and seller never come from the agent), the guard decides.
+ * The same item and quantity proposed twice in one run is a retry: same proposal id, so the guard never pays twice,
+ * and the agent is told so plainly instead of being shown the first purchase again as if it were a new one.
  */
-export async function runAgent(sessionId: string, task: string, persona: Persona = 'default', script: ScriptedProposal[] = []): Promise<void> {
-  const system = persona === 'obedient' && process.env.MANDAT_TEST_HARNESS === '1' ? OBEDIENT : SYSTEM;
-  const guard = guardFor(sessionId);
-  if (!guard) throw new Error('unknown session');
-  const runId = sha256Hex(`${sessionId}:${task}:${Date.now()}`).slice(0, 12);
-  const m = guard.mandate;
-  logAgent(sessionId, runId, 'task', { task, ...(system === OBEDIENT ? { persona: 'obedient' } : {}) });
-
-  // The only path to money, shared by every persona: build the proposal from the catalogue, the guard decides.
-  // The same item and quantity proposed twice in one run is a retry: same proposal id, so the guard never pays twice.
-  // The model is told so plainly, instead of being shown the first purchase again as if it were a new one.
-  const seen = new Set<string>();
-  const propose = async ({ sku, quantity, reason }: { sku: string; quantity: number; reason: string }) => {
+export function proposer(sessionId: string, runId: string) {
+  return async ({ sku, quantity, reason }: { sku: string; quantity: number; reason: string }) => {
+    const guard = guardFor(sessionId);
+    if (!guard) return { status: 'error', message: 'unknown mandate' };
     const p = findProduct(sku);
     if (!p) return { status: 'error', message: `unknown sku ${sku}` };
     const id = `prp_${sha256Hex(`${runId}:${sku}:${quantity}`).slice(0, 16)}`;
-    if (seen.has(id)) {
+    if (guard.ledger.entries.some(e => e.type === 'proposal.received' && (e.data as { proposal: Proposal }).proposal.id === id)) {
       return { status: 'already proposed in this run', note: 'The same item and quantity proposed again counts as a retry: no new order was created. To buy more units, propose a larger quantity once.' };
     }
-    seen.add(id);
+    const m = guard.mandate;
     const proposal: Proposal = {
-      id,
-      mandateId: m.id, merchant: p.merchant, sku: p.sku, title: p.title, category: p.category,
+      id, mandateId: m.id, merchant: p.merchant, sku: p.sku, title: p.title, category: p.category,
       quantity, unitPrice: p.price, reason,
     };
     logAgent(sessionId, runId, 'proposal', { sku, title: p.title, quantity, unitPrice: formatMoney(p.price), merchant: p.merchant, reason });
@@ -67,10 +59,30 @@ export async function runAgent(sessionId: string, task: string, persona: Persona
     }
     switch (outcome.status) {
       case 'paid': return { status: 'paid', amount: formatMoney(outcome.amount) };
-      case 'awaiting_approval': return { status: 'waiting for the person to approve in PayPal', amount: formatMoney(outcome.amount), why: outcome.reasons };
+      case 'awaiting_approval': return { status: 'waiting for the person to approve in PayPal', amount: formatMoney(outcome.amount), why: outcome.reasons, approveUrl: outcome.approveUrl };
       case 'denied': return { status: 'refused by the guard', reasons: outcome.reasons };
       case 'failed': return { status: 'payment failed', reason: outcome.reason };
     }
+  };
+}
+
+/**
+ * `compromised` is not a model: it sends the attacker's proposals straight to the guard, the worst case of a fully
+ * hijacked agent. Like `obedient`, it is honoured only with MANDAT_TEST_HARNESS=1.
+ */
+export async function runAgent(sessionId: string, task: string, persona: Persona = 'default', script: ScriptedProposal[] = []): Promise<void> {
+  const system = persona === 'obedient' && process.env.MANDAT_TEST_HARNESS === '1' ? OBEDIENT : SYSTEM;
+  const guard = guardFor(sessionId);
+  if (!guard) throw new Error('unknown session');
+  const runId = sha256Hex(`${sessionId}:${task}:${Date.now()}`).slice(0, 12);
+  const m = guard.mandate;
+  logAgent(sessionId, runId, 'task', { task, ...(system === OBEDIENT ? { persona: 'obedient' } : {}) });
+
+  // The built-in agent has no one to hand an approval link to: the run page shows it to the person.
+  const viaGuard = proposer(sessionId, runId);
+  const propose = async (args: { sku: string; quantity: number; reason: string }) => {
+    const { approveUrl: _, ...result } = (await viaGuard(args)) as Record<string, unknown>;
+    return result;
   };
 
   const tools = {

@@ -66,6 +66,25 @@ pnpm --filter @mandat/web dev                  # http://localhost:3000
 
 Locally, `JURY_CODE` is empty, so live runs are open. A signing key is generated into `apps/web/.data/` on first use. To receive dispute webhooks locally, expose the app (for example with `cloudflared tunnel --url http://localhost:3000`), create a webhook in the PayPal dashboard for `CUSTOMER.DISPUTE.*` and set `PAYPAL_WEBHOOK_ID`. Without it, the merchant view still polls PayPal for the dispute.
 
+## Use the guard from any agent (MCP)
+
+`packages/mcp-guard` is a Model Context Protocol server that puts the guard in front of any agent: Claude Desktop, Claude Code or any MCP client. The agent gets four tools: `get_mandate`, `search_catalog`, `propose_purchase` and `get_receipt`. It gets no payment tool and no PayPal credentials. Each proposal goes to the Mandat deployment, through the same path as the built-in agent: price and seller come from the catalogue, the guard decides, and the run page shows the external agent's proposals in the same "Agent proposes | Guard decides" view. Above the threshold, the tool returns the PayPal approval link for the agent to hand to the person.
+
+Sign a mandate on the site, take the run id from the page URL (`/s/<id>`), then:
+
+```sh
+# Claude Code
+claude mcp add mandat -e MANDAT_SESSION=<run id> -e MANDAT_ACCESS_CODE=<code> -- node /path/to/mandat/packages/mcp-guard/src/index.ts
+```
+
+```json
+// Claude Desktop: claude_desktop_config.json
+{ "mcpServers": { "mandat": { "command": "node", "args": ["/path/to/mandat/packages/mcp-guard/src/index.ts"],
+  "env": { "MANDAT_SESSION": "<run id>", "MANDAT_ACCESS_CODE": "<code>" } } } }
+```
+
+`MANDAT_URL` defaults to the public deployment; set it to `http://localhost:3000` for a local server (no access code needed there). Node 24 runs the TypeScript source directly. Tested with Claude Code as the external agent: it bought a headlamp through the guard and, asked to submit the partner tent anyway, got the guard's refusal with its three reasons.
+
 ## Tests and evidence
 
 - `pnpm test`: 44 tests on the guard, in about 0.3 s. They cover 12 out-of-mandate cases, approval, idempotency, the cumulative limit (also with concurrent proposals), restoring the guard from its ledger, receipts that must fail verification when one byte changes, an entry is removed, or another key is used, and the buyer's passkey signature (ES256 and Ed25519 from a software authenticator; rejected when it signs another mandate, lacks user verification or presence, comes from another relying party, origin or key, or when the issued mandate was swapped).
@@ -96,12 +115,13 @@ What it shows: Claude mostly ignored instructions hidden in listings, even when 
 ## Project layout
 
 ```
-packages/guard   mandate evaluation, PayPal rail, ledger + receipt, PDF, disputes (no framework, tested alone)
-apps/web         Next.js app: agent (Vercel AI SDK + Claude), routes, webhooks, buyer and merchant views, /verify
-scripts          prompt-injection suite
+packages/guard      mandate evaluation, PayPal rail, ledger + receipt, passkey verification, PDF, disputes (no framework, tested alone)
+packages/mcp-guard  MCP server: any agent can propose purchases, only the guard decides
+apps/web            Next.js app: agent (Vercel AI SDK + Claude), routes, webhooks, buyer and merchant views, /verify
+scripts             prompt-injection suite
 ```
 
-Built with TypeScript, Next.js 16, the Vercel AI SDK with `@ai-sdk/anthropic` (Claude Sonnet 5.5), PayPal REST APIs (Orders v2, Disputes, Webhooks, Tracking), SQLite, pdf-lib, WebAuthn passkeys and Node's built-in crypto (Ed25519 seal, passkey verification). Hosted on Render.
+Built with TypeScript, Next.js 16, the Vercel AI SDK with `@ai-sdk/anthropic` (Claude Sonnet 5.5), PayPal REST APIs (Orders v2, Disputes, Webhooks, Tracking), SQLite, pdf-lib, the MCP TypeScript SDK, WebAuthn passkeys and Node's built-in crypto (Ed25519 seal, passkey verification). Hosted on Render.
 
 ## License
 

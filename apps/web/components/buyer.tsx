@@ -93,7 +93,7 @@ function AgentLog({ s }: { s: SessionState }) {
     const d = e.data as any;
     const sep = e.runId !== run && run !== '';
     run = e.runId;
-    if (e.kind === 'task') lines.push({ key: e.seq, who: 'You', body: <strong>{d.task}</strong>, sep });
+    if (e.kind === 'task') lines.push({ key: e.seq, who: d.source === 'mcp' ? 'MCP' : 'You', body: <strong>{d.task}</strong>, sep });
     else if (e.kind === 'proposal') pending.push(d);
     else if (e.kind === 'guard') {
       // The proposal event carries the agent's reason; newer guard events also carry the item.
