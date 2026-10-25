@@ -4,7 +4,7 @@
 
 Mandat lets an AI shopping agent buy on PayPal under a spending mandate you sign once. The agent (Claude) proposes purchases. A deterministic guard checks each one against the mandate and pays through PayPal. You approve anything above your threshold. Every step is hash-chained and signed into a receipt, so if the payment is disputed, the merchant can show exactly who authorized what.
 
-![The agent proposes a tent from a partner listing that hides a prompt injection; the guard blocks it for three reasons](docs/demo.gif)
+![On a mandate signed with the buyer's passkey, the agent proposes a tent from a partner listing that hides a prompt injection; the guard blocks it for three reasons](docs/demo.gif)
 
 - **Live demo:** https://mandat-zrgh.onrender.com (open the recorded run without a code; live runs need the judges' access code)
 - **Video (2 min):** _link added at submission_
