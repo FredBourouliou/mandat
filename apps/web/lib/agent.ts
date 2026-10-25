@@ -6,6 +6,7 @@ import { formatMoney, sha256Hex, type Proposal } from '@mandat/guard';
 import { searchCatalog, findProduct } from './catalog';
 import { guardFor, logAgent, saveLedger } from './store';
 import { ship } from './merchant';
+import { claudeErrorMessage } from './errors';
 
 export const AGENT_MODEL = 'claude-sonnet-5-5';
 
@@ -42,8 +43,16 @@ export function proposer(sessionId: string, runId: string) {
     const p = findProduct(sku);
     if (!p) return { status: 'error', message: `unknown sku ${sku}` };
     const id = `prp_${sha256Hex(`${runId}:${sku}:${quantity}`).slice(0, 16)}`;
-    if (guard.ledger.entries.some(e => e.type === 'proposal.received' && (e.data as { proposal: Proposal }).proposal.id === id)) {
-      return { status: 'already proposed in this run', note: 'The same item and quantity proposed again counts as a retry: no new order was created. To buy more units, propose a larger quantity once.' };
+    // A retry gets the first attempt's outcome back; only a payment that failed (PayPal error) is tried again.
+    const earlier = guard.ledger.entries.findIndex(e => e.type === 'proposal.received' && (e.data as { proposal: Proposal }).proposal.id === id);
+    if (earlier >= 0) {
+      const RETRY = 'Proposing the same item and quantity again in one run is a retry: no new order was created. To buy more units, propose a larger quantity once.';
+      const order = guard.orders.find(o => o.proposal.id === id);
+      if (order?.state === 'paid') return { status: 'already bought in this run', amount: formatMoney(order.amount), note: RETRY };
+      if (order?.state === 'awaiting_approval') return { status: 'already proposed, waiting for the person to approve in PayPal', amount: formatMoney(order.amount), approveUrl: order.approveUrl, note: RETRY };
+      const decision = guard.ledger.entries[earlier + 1];
+      const failed = guard.ledger.entries.some(e => e.type === 'order.failed' && (e.data as { proposalId?: string }).proposalId === id);
+      if (!failed) return { status: 'already refused by the guard in this run', reasons: (decision?.data as { reasons?: string[] })?.reasons ?? [], note: RETRY };
     }
     const m = guard.mandate;
     const proposal: Proposal = {
@@ -125,6 +134,6 @@ export async function runAgent(sessionId: string, task: string, persona: Persona
     });
     logAgent(sessionId, runId, 'done', { text: text.trim() || 'I stopped after the maximum number of steps for one run. Everything above shows what was proposed and what the guard decided.' });
   } catch (e) {
-    logAgent(sessionId, runId, 'error', { message: e instanceof Error ? e.message : String(e) });
+    logAgent(sessionId, runId, 'error', { message: claudeErrorMessage(e), detail: e instanceof Error ? e.message : String(e) });
   }
 }

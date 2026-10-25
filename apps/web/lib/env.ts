@@ -14,6 +14,8 @@ function required(name: string): string {
 export const DATA_DIR = process.env.DATA_DIR ?? join(process.cwd(), '.data');
 
 export const PUBLIC_URL = (process.env.PUBLIC_URL ?? 'http://localhost:3000').replace(/\/$/, '');
+/** Where buyer passkeys must have signed: this deployment's origin and host name (the WebAuthn relying party). */
+export const SIGNER = { origin: PUBLIC_URL, rpId: new URL(PUBLIC_URL).hostname };
 export const JURY_CODE = process.env.JURY_CODE ?? '';
 /** A recorded session that visitors without the access code can replay, read-only. */
 export const DEMO_SESSION_ID = process.env.DEMO_SESSION_ID ?? '';

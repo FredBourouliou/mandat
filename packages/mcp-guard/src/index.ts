@@ -14,6 +14,12 @@ import * as z from 'zod';
 const BASE = (process.env.MANDAT_URL ?? 'https://mandat-zrgh.onrender.com').replace(/\/$/, '');
 const SESSION = process.env.MANDAT_SESSION ?? '';
 const CODE = process.env.MANDAT_ACCESS_CODE ?? '';
+// The access code travels in a request body: never over plain HTTP, except to a server on this machine.
+const host = new URL(BASE).hostname;
+if (!BASE.startsWith('https://') && !['localhost', '127.0.0.1', '::1'].includes(host)) {
+  throw new Error(`MANDAT_URL must use https (got ${BASE})`);
+}
+const SID = encodeURIComponent(SESSION);
 // One run per server process: the run page groups this agent's proposals, and a repeated proposal is a retry.
 const RUN = `mcp_${randomBytes(8).toString('hex')}`;
 
@@ -54,7 +60,7 @@ server.registerTool('get_mandate', {
 }, async () => {
   try {
     needSession();
-    const s = await api('GET', `/api/sessions/${encodeURIComponent(SESSION)}`);
+    const s = await api('GET', `/api/sessions/${SID}`);
     const m = s.mandate;
     return text({
       purpose: m.purpose, merchants: m.merchants, categories: m.categories,
@@ -62,7 +68,7 @@ server.registerTool('get_mandate', {
       maxPurchases: m.maxPurchases, validUntil: m.validUntil,
       spent: eur(s.spent.total), purchases: s.spent.count, left: eur({ ...m.maxTotal, minor: m.maxTotal.minor - s.spent.total.minor }),
       signedByBuyer: s.buyer?.status === 'signed' ? 'yes, with a passkey (user verified)' : 'no',
-      runPage: `${BASE}/s/${SESSION}`,
+      runPage: `${BASE}/s/${SID}`,
     });
   } catch (e) { return failure(e); }
 });
@@ -89,7 +95,7 @@ server.registerTool('propose_purchase', {
   try {
     needSession();
     const client = server.server.getClientVersion()?.name;
-    const r = await api('POST', `/api/sessions/${encodeURIComponent(SESSION)}/proposals`, { run: RUN, client, sku, quantity, reason });
+    const r = await api('POST', `/api/sessions/${SID}/proposals`, { run: RUN, client, sku, quantity, reason });
     if (r.approveUrl) r.next = `Give the person this PayPal link to approve: ${r.approveUrl}`;
     return text(r);
   } catch (e) { return failure(e); }
@@ -103,10 +109,10 @@ server.registerTool('get_receipt', {
 }, async () => {
   try {
     needSession();
-    const r = await api('GET', `/api/sessions/${encodeURIComponent(SESSION)}/receipt`);
+    const r = await api('GET', `/api/sessions/${SID}/receipt`);
     return text({
       entries: r.entries.length, head: r.head, signingKey: r.keyId,
-      verify: `${BASE}/verify?session=${SESSION}`, evidencePdf: `${BASE}/api/sessions/${SESSION}/receipt?format=pdf`,
+      verify: `${BASE}/verify?session=${SID}`, evidencePdf: `${BASE}/api/sessions/${SID}/receipt?format=pdf`,
     });
   } catch (e) { return failure(e); }
 });

@@ -29,7 +29,7 @@ export function MandateTerms({ s }: { s: SessionState }) {
     <section className="deed" aria-labelledby="mandate-title">
       <div className="stack" style={{ gap: 'var(--space-2xs)' }}>
         <h1 id="mandate-title" className="h-doc">{m.purpose}</h1>
-        <p className="faint">Spending mandate {s.buyer.status === 'signed' ? 'signed with your passkey' : s.buyer.status === 'unsigned' ? 'issued without a passkey signature' : 'with an invalid signature'} {new Date(s.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+        <p className="faint">Spending mandate {s.buyer.status === 'signed' ? 'signed with a passkey' : s.buyer.status === 'unsigned' ? 'issued without a passkey signature' : 'with an invalid signature'} {new Date(s.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
       </div>
       <dl className="terms">
         <dt>Merchant</dt><dd>Atelier Voyage</dd>

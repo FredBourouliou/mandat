@@ -9,7 +9,7 @@ type Verdict = 'allow' | 'pending' | 'deny' | 'neutral';
 export function describeEntry(type: string, d: any): { label: string; detail?: string; verdict?: [Verdict, string] } {
   switch (type) {
     case 'mandate.issued': return { label: 'Mandate issued', detail: d.mandate?.purpose };
-    case 'mandate.signed': return { label: 'You signed the mandate with your passkey', detail: `User verified on this device · credential ${short(String(d.credentialId), 10)}`, verdict: ['allow', 'Signed'] };
+    case 'mandate.signed': return { label: 'The mandate was signed with a passkey', detail: `User verification reported by the authenticator · credential ${short(String(d.credentialId), 10)}`, verdict: ['allow', 'Signed'] };
     case 'proposal.received': return { label: `Agent proposed ${d.proposal?.title} ×${d.proposal?.quantity}`, detail: `${money(d.proposal?.unitPrice)} each, sold by ${d.proposal?.merchant}. “${d.proposal?.reason}”` };
     case 'decision':
       if (d.kind === 'deny') return { label: 'Guard refused', detail: d.reasons?.join('; '), verdict: ['deny', 'Blocked'] };

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { clientIp, hasLiveAccess } from '@/lib/access';
+import { canAct, clientIp } from '@/lib/access';
 import { consume } from '@/lib/db';
 import { proposer } from '@/lib/agent';
 import { agentEvents, getSession, logAgent } from '@/lib/store';
@@ -19,7 +19,7 @@ const Body = z.object({
  */
 export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
-  if (!(await hasLiveAccess())) return NextResponse.json({ error: 'An access code is required for live runs.' }, { status: 403 });
+  if (!(await canAct(id))) return NextResponse.json({ error: 'An access code is required for live runs.' }, { status: 403 });
   if (!getSession(id)) return NextResponse.json({ error: 'Not found.' }, { status: 404 });
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: 'Invalid proposal.' }, { status: 400 });

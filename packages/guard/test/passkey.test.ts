@@ -43,11 +43,11 @@ function authenticator(kind: 'ec' | 'ed25519' = 'ec') {
 
 describe('buyer passkey signature', () => {
   it('accepts an ES256 assertion over the mandate hash', () => {
-    expect(verifyMandateSignature(authenticator().assert(HASH), HASH, ORIGIN)).toEqual({ valid: true });
+    expect(verifyMandateSignature(authenticator().assert(HASH), HASH, { origin: ORIGIN })).toEqual({ valid: true });
   });
 
   it('accepts an Ed25519 assertion', () => {
-    expect(verifyMandateSignature(authenticator('ed25519').assert(HASH), HASH, ORIGIN)).toEqual({ valid: true });
+    expect(verifyMandateSignature(authenticator('ed25519').assert(HASH), HASH, { origin: ORIGIN })).toEqual({ valid: true });
   });
 
   it('rejects a signature over another mandate', () => {
@@ -70,7 +70,29 @@ describe('buyer passkey signature', () => {
 
   it('rejects an assertion made on another origin than expected', () => {
     const sig = { ...authenticator().assert(HASH, { origin: 'https://phish.example' }), origin: 'https://phish.example' };
-    expect(verifyMandateSignature(sig, HASH, ORIGIN).valid).toBe(false);
+    expect(verifyMandateSignature(sig, HASH, { origin: ORIGIN }).valid).toBe(false);
+  });
+
+  it('rejects a key whose type does not match the declared algorithm', () => {
+    const ed = authenticator('ed25519').assert(HASH);
+    expect(verifyMandateSignature({ ...ed, alg: -7 }, HASH)).toEqual({ valid: false, reason: 'key type does not match algorithm -7' });
+    const p384 = generateKeyPairSync('ec', { namedCurve: 'secp384r1' }).publicKey.export({ format: 'der', type: 'spki' }).toString('base64url');
+    expect(verifyMandateSignature({ ...authenticator().assert(HASH), publicKey: p384 }, HASH).valid).toBe(false);
+  });
+
+  it('rejects a relying party other than the one the verifier expects', () => {
+    expect(verifyMandateSignature(authenticator().assert(HASH), HASH, { rpId: 'other.example' }).valid).toBe(false);
+  });
+
+  it('rejects an assertion made inside a frame of another site', () => {
+    const sig = authenticator().assert(HASH);
+    const client = JSON.parse(Buffer.from(sig.clientDataJSON, 'base64url').toString());
+    const forged = { ...sig, clientDataJSON: Buffer.from(JSON.stringify({ ...client, crossOrigin: true })).toString('base64url') };
+    expect(verifyMandateSignature(forged, HASH)).toMatchObject({ valid: false });
+  });
+
+  it('returns a reason instead of throwing on malformed fields', () => {
+    expect(verifyMandateSignature({ ...authenticator().assert(HASH), rpId: 42 as unknown as string }, HASH).valid).toBe(false);
   });
 
   it('rejects a client data origin that differs from the recorded one', () => {
@@ -83,7 +105,7 @@ describe('buyer signature in the ledger', () => {
   it('reads a signed mandate', () => {
     const g = new Guard(mandate, rail);
     g.record('mandate.signed', authenticator().assert(HASH));
-    expect(buyerSignature(g.ledger.entries, g.hash, ORIGIN)).toMatchObject({ status: 'signed', credentialId: 'cred-1', userVerified: true });
+    expect(buyerSignature(g.ledger.entries, g.hash, { origin: ORIGIN, rpId: RP })).toMatchObject({ status: 'signed', credentialId: 'cred-1', userVerified: true });
   });
 
   it('reports an unsigned mandate as such', () => {

@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { mandateHash, verifyMandateSignature, type Mandate, type MandateSignature } from '@mandat/guard';
 import { DEMO_MERCHANT } from './catalog';
 import { db } from './db';
-import { PUBLIC_URL } from './env';
+import { SIGNER } from './env';
 import { newId } from './store';
 
 export const MandateBody = z.object({
@@ -35,7 +35,7 @@ export function buildMandate(b: z.infer<typeof MandateBody>): Mandate {
 }
 
 /** The relying party is this deployment: passkeys are bound to its host name. */
-export const RP_ID = new URL(PUBLIC_URL).hostname;
+export const RP_ID = SIGNER.rpId;
 const DRAFT_TTL_MS = 10 * 60_000;
 
 /** Stores a mandate waiting for the buyer's passkey. Its id and dates are fixed now, so the hash the passkey signs is final. */
@@ -64,7 +64,7 @@ export const SignatureBody = z.object({
 /** Completes the assertion with this deployment's origin and relying party, then checks it against the draft's hash. */
 export function checkSignature(mandate: Mandate, b: z.infer<typeof SignatureBody>): MandateSignature | string {
   const { mandateId: _, ...rest } = b;
-  const sig: MandateSignature = { scheme: 'webauthn', rpId: RP_ID, origin: PUBLIC_URL, ...rest };
-  const r = verifyMandateSignature(sig, mandateHash(mandate), PUBLIC_URL);
+  const sig: MandateSignature = { scheme: 'webauthn', rpId: SIGNER.rpId, origin: SIGNER.origin, ...rest };
+  const r = verifyMandateSignature(sig, mandateHash(mandate), SIGNER);
   return r.valid ? sig : r.reason;
 }

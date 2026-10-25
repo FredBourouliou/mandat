@@ -97,9 +97,10 @@ export function MandateForm() {
       </div>
       <p className="faint">
         {canSign
-          ? 'Touch ID, Face ID or your device PIN signs this exact mandate; Mandat never holds the key. Without a passkey, the receipt says the buyer did not sign.'
+          ? 'Touch ID, Face ID or your device PIN signs this exact mandate; Mandat never holds the key. The first time, your browser offers to create a passkey for this demo site: any place to save it works, this device is simplest. Without a passkey, the receipt says the buyer did not sign.'
           : 'This browser cannot use passkeys here, so the mandate will not carry your signature.'} Sandbox only. Capped at 200 EUR.
       </p>
+      <p className="sr-only" role="status" aria-live="polite">{busy}</p>
       {error && <p className="error" role="alert">{error}</p>}
       {error && stored && !busy && <button type="button" className="btn btn-quiet" onClick={() => { forgetPasskey(); setStored(false); setError(''); }}>Use a new passkey next time</button>}
     </form>

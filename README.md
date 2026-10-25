@@ -50,7 +50,7 @@ flowchart LR
 | Chargebacks, dispute webhooks (signature verified), evidence upload (`provide-supporting-info` / `provide-evidence`) | |
 | Claude agent runs and dispute drafts | |
 
-A valid seal proves the receipt was not altered after Mandat signed it. A valid buyer signature proves that the holder of that passkey approved this exact mandate with user verification, and that Mandat could not have produced it. Neither proves on its own whose passkey it is: in this demo the passkey is not tied to an account (synced passkeys carry no attestation). Neither proves that the facts are true: PayPal's records of the same order (custom_id, capture, payer, tracking) back them up.
+A valid seal proves the receipt was not altered after Mandat signed it. A valid buyer signature proves that the holder of that passkey approved this exact mandate with user verification, and that Mandat could not have produced it. The user-verification flag (Touch ID, Face ID or a PIN) is reported by the authenticator; without attestation it is that authenticator's own claim, and a scripted software key could set it too. Neither proves on its own whose passkey it is: in this demo the passkey is not tied to an account (synced passkeys carry no attestation). Neither proves that the facts are true: PayPal's records of the same order (custom_id, capture, payer, tracking) back them up.
 
 ## Quick start
 

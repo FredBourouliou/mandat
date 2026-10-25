@@ -6,7 +6,7 @@ import {
   buyerSignature, formatMoney, getDispute, receiptPdf, respondToDispute, simulateChargeback, verifyReceipt, type DisputeView,
 } from '@mandat/guard';
 import { db } from './db';
-import { paypal, PUBLIC_URL, signingKey } from './env';
+import { paypal, PUBLIC_URL, SIGNER, signingKey } from './env';
 import { guardFor } from './store';
 
 export interface DisputeRow {
@@ -21,6 +21,11 @@ export function disputesFor(sessionId: string): DisputeRow[] {
 }
 
 const DISPUTE_ID = /^PP-[A-Z0-9-]{4,40}$/;
+
+/** The session a dispute belongs to (the dispute must be known). */
+export function disputeSession(id: string): string {
+  return (db().prepare('SELECT session_id FROM disputes WHERE id = ?').get(id) as { session_id: string }).session_id;
+}
 
 /** Only disputes this app opened can be acted on. */
 export function knownDispute(id: string): boolean {
@@ -80,7 +85,7 @@ export async function draftResponse(id: string): Promise<Draft> {
   const { guard, receipt } = sealedFor(row.session_id);
   const valid = verifyReceipt(receipt, signingKey().publicKey).valid;
   const view = row.view ? (JSON.parse(row.view) as DisputeView) : null;
-  const buyer = buyerSignature(receipt.entries, receipt.mandateHash, PUBLIC_URL);
+  const buyer = buyerSignature(receipt.entries, receipt.mandateHash, SIGNER);
   // The passkey assertion is binary noise to a reader: Claude gets the verified result instead.
   const entries = receipt.entries.map(e => `#${e.seq} ${e.at} ${e.type} ${e.type === 'mandate.signed' ? JSON.stringify({ rpId: (e.data as any).rpId, credentialId: (e.data as any).credentialId }) : JSON.stringify(e.data)}`).join('\n');
   const { output } = await generateText({
@@ -89,13 +94,13 @@ export async function draftResponse(id: string): Promise<Draft> {
     maxOutputTokens: 1500,
     system: `You write a merchant's response to a payment dispute for PayPal reviewers. Use only facts present in the ledger below; never invent facts.
 Explain that the purchase was made by the buyer's AI agent under a signed spending mandate, that the guard checked it against the mandate,
-which human approval or payment step happened (payer id, capture), and the shipment tracking. If the buyer signature is verified, say that the buyer
-signed the exact mandate with their own passkey (WebAuthn, user verification) before the agent could spend, a key Mandat does not hold; if unsigned, do not claim it. Mention that the receipt is hash-chained and signed (Ed25519)
+which human approval or payment step happened (payer id, capture), and the shipment tracking. If the buyer signature is verified, say that the exact mandate
+was signed with a passkey (WebAuthn assertion, user-verification flag set by the authenticator) before the agent could spend, with a key Mandat does not hold; if unsigned, do not claim it. Mention that the receipt is hash-chained and signed (Ed25519)
 and can be verified at ${PUBLIC_URL}/verify. Be concise and factual.`,
     prompt: `Dispute ${id}: stage ${view?.stage ?? 'CHARGEBACK'}, reason ${view?.reason ?? 'unknown'}, amount ${view?.amount ? formatMoney(view.amount) : 'n/a'}.
 Disputed PayPal order ${row.order_id}, capture ${row.capture_id}.
 Mandate hash (stored by PayPal as the order custom_id): ${guard.hash}. Receipt signature valid: ${valid}.
-Buyer signature on the mandate: ${buyer.status === 'signed' ? 'verified passkey assertion (user verified)' : buyer.status === 'unsigned' ? 'none (unsigned mandate)' : `invalid (${buyer.reason})`}.
+Buyer signature on the mandate: ${buyer.status === 'signed' ? 'verified passkey assertion (user-verification flag set)' : buyer.status === 'unsigned' ? 'none (unsigned mandate)' : `invalid (${buyer.reason})`}.
 
 Ledger:
 ${entries}`,

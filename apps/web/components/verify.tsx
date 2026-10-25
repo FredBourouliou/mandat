@@ -19,12 +19,12 @@ function Verdict({ r }: { r: Result }) {
         <dt>Hash chain</dt><dd>{r.seal ? <><span className="verdict verdict-allow">Intact</span> {r.entries} entries</> : chainBroken ? <span className="verdict verdict-deny">Broken</span> : badSignature ? <span className="verdict verdict-allow">Intact</span> : 'not checked'}</dd>
         <dt>Signature</dt><dd>{r.seal ? <><span className="verdict verdict-allow">Valid</span> key <code>{r.keyId}</code></> : badSignature ? <span className="verdict verdict-deny">Does not match</span> : 'not checked'}</dd>
         <dt>Buyer</dt><dd>{!b ? 'not checked'
-          : b.status === 'signed' ? <><span className="verdict verdict-allow">Signed</span> with their passkey, user verified</>
+          : b.status === 'signed' ? <><span className="verdict verdict-allow">Signed</span> with a passkey, user verification reported</>
           : b.status === 'unsigned' ? <><span className="verdict verdict-pending">Not signed</span> attested by this deployment only</>
           : <><span className="verdict verdict-deny">Invalid</span> {b.reason}</>}</dd>
       </dl>
       {chainBroken && <p className="faint">{reason}.</p>}
-      <p className="faint">A valid seal proves the receipt was not altered since this Mandat deployment signed it. A buyer signature proves the holder of that passkey approved this exact mandate, with Touch ID, Face ID or a PIN; Mandat never holds the key. Neither proves on its own whose passkey it is (in this demo it is not tied to an account) or that what the receipt records is true: PayPal's records of the same order (custom_id, capture, tracking) back that up.</p>
+      <p className="faint">A valid seal proves the receipt was not altered since this Mandat deployment signed it. A buyer signature proves the holder of that passkey approved this exact mandate; Mandat never holds the key. The authenticator reports that Touch ID, Face ID or a PIN was used, but without attestation that flag is its own claim. Neither proves on its own whose passkey it is (in this demo it is not tied to an account) or that what the receipt records is true: PayPal's records of the same order (custom_id, capture, tracking) back that up.</p>
     </section>
   );
 }

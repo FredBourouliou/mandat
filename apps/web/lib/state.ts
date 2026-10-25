@@ -2,7 +2,7 @@ import 'server-only';
 import { buyerSignature, mandateHash, type Mandate } from '@mandat/guard';
 import { agentEvents, getSession, guardFor } from './store';
 import { disputesFor } from './disputes';
-import { PUBLIC_URL } from './env';
+import { SIGNER } from './env';
 
 export const running = new Set<string>();
 
@@ -17,7 +17,7 @@ export function sessionState(id: string) {
     createdAt: row.created_at,
     mandate,
     mandateHash: mandateHash(mandate),
-    buyer: buyerSignature(guard.ledger.entries, guard.hash, PUBLIC_URL),
+    buyer: buyerSignature(guard.ledger.entries, guard.hash, SIGNER),
     spent: guard.spent,
     ledger: guard.ledger.entries,
     orders: guard.orders,

@@ -10,11 +10,14 @@ import { createSession } from '@/lib/store';
  */
 export async function POST(req: Request) {
   if (!(await hasLiveAccess())) return NextResponse.json({ error: 'An access code is required for live runs.' }, { status: 403 });
-  if (!consume(`session:${await clientIp()}`, 20)) return NextResponse.json({ error: 'Daily limit reached for new mandates.' }, { status: 429 });
   const body = await req.json().catch(() => null);
+  // Counted only for valid requests, so typos do not eat the daily quota of people sharing one address.
+  const quota = async () => consume(`session:${await clientIp()}`, 20);
+  const LIMIT = () => NextResponse.json({ error: 'Daily limit reached for new mandates.' }, { status: 429 });
 
   const signed = SignatureBody.safeParse(body);
   if (signed.success) {
+    if (!(await quota())) return LIMIT();
     const mandate = takeDraft(signed.data.mandateId);
     if (!mandate) return NextResponse.json({ error: 'This mandate expired. Sign it again.' }, { status: 410 });
     const sig = checkSignature(mandate, signed.data);
@@ -24,5 +27,6 @@ export async function POST(req: Request) {
 
   const parsed = MandateBody.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: 'Invalid mandate.' }, { status: 400 });
+  if (!(await quota())) return LIMIT();
   return NextResponse.json({ id: createSession(buildMandate(parsed.data)) });
 }

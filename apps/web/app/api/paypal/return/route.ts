@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { hasLiveAccess } from '@/lib/access';
+import { canAct } from '@/lib/access';
 import { PUBLIC_URL } from '@/lib/env';
 import { guardFor, railFor, saveLedger } from '@/lib/store';
 import { ship } from '@/lib/merchant';
@@ -12,7 +12,7 @@ export async function GET(req: Request) {
   const back = `${PUBLIC_URL}/s/${encodeURIComponent(sessionId)}`;
   const guard = guardFor(sessionId);
   const order = guard?.orders.find(o => o.orderId === orderId);
-  if (!guard || !order || !(await hasLiveAccess())) return NextResponse.redirect(back);
+  if (!guard || !order || !(await canAct(sessionId))) return NextResponse.redirect(back);
   if (url.searchParams.get('cancel')) {
     // The URL alone proves nothing: record a cancellation only if PayPal confirms the order was not approved, and only once.
     const status = await railFor(sessionId).getOrder(orderId).then(o => o.status as string, () => 'UNKNOWN');
