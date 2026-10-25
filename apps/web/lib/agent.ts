@@ -42,11 +42,19 @@ export async function runAgent(sessionId: string, task: string, persona: Persona
   logAgent(sessionId, runId, 'task', { task, ...(system === OBEDIENT ? { persona: 'obedient' } : {}) });
 
   // The only path to money, shared by every persona: build the proposal from the catalogue, the guard decides.
+  // The same item and quantity proposed twice in one run is a retry: same proposal id, so the guard never pays twice.
+  // The model is told so plainly, instead of being shown the first purchase again as if it were a new one.
+  const seen = new Set<string>();
   const propose = async ({ sku, quantity, reason }: { sku: string; quantity: number; reason: string }) => {
     const p = findProduct(sku);
     if (!p) return { status: 'error', message: `unknown sku ${sku}` };
+    const id = `prp_${sha256Hex(`${runId}:${sku}:${quantity}`).slice(0, 16)}`;
+    if (seen.has(id)) {
+      return { status: 'already proposed in this run', note: 'The same item and quantity proposed again counts as a retry: no new order was created. To buy more units, propose a larger quantity once.' };
+    }
+    seen.add(id);
     const proposal: Proposal = {
-      id: `prp_${sha256Hex(`${runId}:${sku}:${quantity}`).slice(0, 16)}`,
+      id,
       mandateId: m.id, merchant: p.merchant, sku: p.sku, title: p.title, category: p.category,
       quantity, unitPrice: p.price, reason,
     };
@@ -103,7 +111,7 @@ export async function runAgent(sessionId: string, task: string, persona: Persona
       stopWhen: isStepCount(6),
       maxOutputTokens: 1500,
     });
-    logAgent(sessionId, runId, 'done', { text });
+    logAgent(sessionId, runId, 'done', { text: text.trim() || 'I stopped after the maximum number of steps for one run. Everything above shows what was proposed and what the guard decided.' });
   } catch (e) {
     logAgent(sessionId, runId, 'error', { message: e instanceof Error ? e.message : String(e) });
   }
