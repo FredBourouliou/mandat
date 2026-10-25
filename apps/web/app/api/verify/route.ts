@@ -15,7 +15,7 @@ export async function POST(req: Request) {
     const seal = verifyReceipt(receipt, key.publicKey);
     const buyer = buyerSignature(receipt.entries, receipt.mandateHash, PUBLIC_URL);
     const result = seal.valid && buyer.status === 'invalid' ? { valid: false, reason: `buyer signature: ${buyer.reason}` } : seal;
-    return NextResponse.json({ ...result, buyer, keyId: key.keyId, entries: receipt.entries.length });
+    return NextResponse.json({ ...result, seal: seal.valid, buyer, keyId: key.keyId, entries: receipt.entries.length });
   } catch {
     return NextResponse.json({ valid: false, reason: 'malformed receipt' });
   }

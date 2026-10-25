@@ -3,7 +3,7 @@ import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 
 type Buyer = { status: 'signed'; credentialId: string; signedAt: string } | { status: 'unsigned' } | { status: 'invalid'; reason: string };
-type Result = { valid: boolean; reason?: string; entries?: number; keyId?: string; buyer?: Buyer };
+type Result = { valid: boolean; reason?: string; seal?: boolean; entries?: number; keyId?: string; buyer?: Buyer };
 
 /** The answer first, then the two checks behind it, then what a seal does not prove. */
 function Verdict({ r }: { r: Result }) {
@@ -16,8 +16,8 @@ function Verdict({ r }: { r: Result }) {
       <h2 id="verdict-title" className="h-sub">{r.valid ? 'Receipt intact' : 'Receipt rejected'}</h2>
       {!r.valid && !chainBroken && !badSignature && <p>{reason}</p>}
       <dl className="terms">
-        <dt>Hash chain</dt><dd>{r.valid ? <><span className="verdict verdict-allow">Intact</span> {r.entries} entries</> : chainBroken ? <span className="verdict verdict-deny">Broken</span> : badSignature ? <span className="verdict verdict-allow">Intact</span> : 'not checked'}</dd>
-        <dt>Signature</dt><dd>{r.valid || b?.status === 'invalid' ? <><span className="verdict verdict-allow">Valid</span> key <code>{r.keyId}</code></> : badSignature ? <span className="verdict verdict-deny">Does not match</span> : 'not checked'}</dd>
+        <dt>Hash chain</dt><dd>{r.seal ? <><span className="verdict verdict-allow">Intact</span> {r.entries} entries</> : chainBroken ? <span className="verdict verdict-deny">Broken</span> : badSignature ? <span className="verdict verdict-allow">Intact</span> : 'not checked'}</dd>
+        <dt>Signature</dt><dd>{r.seal ? <><span className="verdict verdict-allow">Valid</span> key <code>{r.keyId}</code></> : badSignature ? <span className="verdict verdict-deny">Does not match</span> : 'not checked'}</dd>
         <dt>Buyer</dt><dd>{!b ? 'not checked'
           : b.status === 'signed' ? <><span className="verdict verdict-allow">Signed</span> with their passkey, user verified</>
           : b.status === 'unsigned' ? <><span className="verdict verdict-pending">Not signed</span> attested by this deployment only</>
