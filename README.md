@@ -20,6 +20,7 @@ AI agents are starting to buy on our behalf, which makes both sides worse unless
 
 | Step | Who | What happens |
 | --- | --- | --- |
+| 0 | **You sign with a passkey** | The WebAuthn challenge is the mandate's SHA-256 hash, so Touch ID, Face ID or a PIN signs exactly that mandate. The server checks origin, relying party, user verification and the signature (Node's `crypto`, no WebAuthn library), and records the assertion as ledger entry #1. Mandat never holds the key. Without a passkey, the mandate is recorded as unsigned and every receipt says so. |
 | 1 | **Claude proposes** | The agent searches the merchant catalogue and calls `propose_purchase`. It has no payment tool and never sees PayPal credentials. Catalogue text is untrusted. |
 | 2 | **The guard decides** | Plain TypeScript checks merchant, category, per-purchase limit, total, number of purchases and validity dates. A prompt cannot widen the mandate. Concurrent proposals are serialized, so two of them cannot both pass the total. |
 | 3 | **You approve** | Above your threshold, the guard creates a PayPal order with a `payer-action` link and only captures it after you approve on PayPal's own page. |
@@ -29,7 +30,7 @@ AI agents are starting to buy on our behalf, which makes both sides worse unless
 
 ```mermaid
 flowchart LR
-  U[You sign a mandate] --> A[Claude agent]
+  U[You sign the mandate with your passkey] --> A[Claude agent]
   A -- propose_purchase --> G{Deterministic guard}
   G -- outside the mandate --> X[Blocked, recorded]
   G -- under threshold --> P[PayPal Orders v2: capture]
@@ -49,7 +50,7 @@ flowchart LR
 | Chargebacks, dispute webhooks (signature verified), evidence upload (`provide-supporting-info` / `provide-evidence`) | |
 | Claude agent runs and dispute drafts | |
 
-A valid seal proves the receipt was not altered after Mandat signed it. It does not prove on its own that the facts are true: PayPal's records of the same order (custom_id, capture, payer, tracking) back them up.
+A valid seal proves the receipt was not altered after Mandat signed it. A valid buyer signature proves that the holder of that passkey approved this exact mandate with user verification, and that Mandat could not have produced it. Neither proves on its own whose passkey it is: in this demo the passkey is not tied to an account (synced passkeys carry no attestation). Neither proves that the facts are true: PayPal's records of the same order (custom_id, capture, payer, tracking) back them up.
 
 ## Quick start
 
@@ -67,7 +68,9 @@ Locally, `JURY_CODE` is empty, so live runs are open. A signing key is generated
 
 ## Tests and evidence
 
-- `pnpm test`: 26 unit tests on the guard. They cover 12 out-of-mandate cases, approval, idempotency, the cumulative limit (also with concurrent proposals), restoring the guard from its ledger, and receipts that must fail verification when one byte changes, an entry is removed, or another key is used.
+- `pnpm test`: 44 tests on the guard, in about 0.3 s. They cover 12 out-of-mandate cases, approval, idempotency, the cumulative limit (also with concurrent proposals), restoring the guard from its ledger, receipts that must fail verification when one byte changes, an entry is removed, or another key is used, and the buyer's passkey signature (ES256 and Ed25519 from a software authenticator; rejected when it signs another mandate, lacks user verification or presence, comes from another relying party, origin or key, or when the issued mandate was swapped).
+- Property-based tests (fast-check): for any mandate and any sequence of up to 12 proposals a hijacked agent could make (any merchant, category, currency, price or quantity, including zero, negative and fractional values), sequential or concurrent, no order outside the mandate reaches PayPal; a proposal never creates two orders; the guard rebuilt from its ledger has the same state; and any change to any sealed entry is rejected. Checked by mutation: disabling any one of ten guard rules (each limit, currency, merchant, dates, quantity, serialization, idempotency) makes these properties fail.
+- The passkey flow was also run in Chromium with a virtual WebAuthn authenticator: first use (create then sign), reuse of the same passkey, the unsigned path, a signature replayed on another mandate (rejected) and a mandate edited inside a signed receipt (rejected twice: chain and buyer signature).
 - `packages/guard/scripts/*.ts`: end-to-end runs against the real PayPal sandbox (direct payment, idempotent re-submission, approval then capture, tracking, PDF).
 - `scripts/injection-suite.ts`: 30 attacks in five families (direct requests, false authority, manipulated proposals, instructions hidden in listings, budget exhaustion), each on a fresh mandate, run with three agent personas, and checked independently of what the agent says. **Results: [docs/injection-results.md](docs/injection-results.md)** (raw data in `docs/injection-results.json`).
 
@@ -84,6 +87,7 @@ What it shows: Claude mostly ignored instructions hidden in listings, even when 
 ## Security notes
 
 - The model has no payment authority. Only the guard calls PayPal, with amounts taken from the catalogue, never from the model.
+- The buyer's passkey signs the mandate hash itself; a draft can be signed once and expires after 10 minutes, and the server only accepts assertions made on its own origin with user verification.
 - Idempotency: `PayPal-Request-Id = sha256(mandate, proposal, step)`, so retries never create a second order or capture.
 - Webhooks are verified with PayPal's `verify-webhook-signature` and deduplicated by event id.
 - The public deployment gates live calls behind an access code, with per-session, per-IP and daily limits on agent runs.
@@ -97,7 +101,7 @@ apps/web         Next.js app: agent (Vercel AI SDK + Claude), routes, webhooks, 
 scripts          prompt-injection suite
 ```
 
-Built with TypeScript, Next.js 16, the Vercel AI SDK with `@ai-sdk/anthropic` (Claude Sonnet 5.5), PayPal REST APIs (Orders v2, Disputes, Webhooks, Tracking), SQLite, pdf-lib and Node's built-in Ed25519. Hosted on Render.
+Built with TypeScript, Next.js 16, the Vercel AI SDK with `@ai-sdk/anthropic` (Claude Sonnet 5.5), PayPal REST APIs (Orders v2, Disputes, Webhooks, Tracking), SQLite, pdf-lib, WebAuthn passkeys and Node's built-in crypto (Ed25519 seal, passkey verification). Hosted on Render.
 
 ## License
 

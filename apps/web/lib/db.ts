@@ -24,6 +24,11 @@ CREATE TABLE IF NOT EXISTS sessions (
   mandate TEXT NOT NULL,
   ledger TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS mandate_drafts (
+  id TEXT PRIMARY KEY,
+  created_at TEXT NOT NULL,
+  mandate TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS agent_events (
   session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
   seq INTEGER NOT NULL,

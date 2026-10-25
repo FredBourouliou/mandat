@@ -2,23 +2,29 @@
 import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 
-type Result = { valid: boolean; reason?: string; entries?: number; keyId?: string };
+type Buyer = { status: 'signed'; credentialId: string; signedAt: string } | { status: 'unsigned' } | { status: 'invalid'; reason: string };
+type Result = { valid: boolean; reason?: string; entries?: number; keyId?: string; buyer?: Buyer };
 
 /** The answer first, then the two checks behind it, then what a seal does not prove. */
 function Verdict({ r }: { r: Result }) {
   const reason = r.reason ?? '';
   const chainBroken = /^entry|^head/.test(reason);
   const badSignature = reason.startsWith('signature');
+  const b = r.buyer;
   return (
     <section className={`notice reveal ${r.valid ? '' : 'notice-seal'}`} role="status" aria-labelledby="verdict-title">
       <h2 id="verdict-title" className="h-sub">{r.valid ? 'Receipt intact' : 'Receipt rejected'}</h2>
       {!r.valid && !chainBroken && !badSignature && <p>{reason}</p>}
       <dl className="terms">
         <dt>Hash chain</dt><dd>{r.valid ? <><span className="verdict verdict-allow">Intact</span> {r.entries} entries</> : chainBroken ? <span className="verdict verdict-deny">Broken</span> : badSignature ? <span className="verdict verdict-allow">Intact</span> : 'not checked'}</dd>
-        <dt>Signature</dt><dd>{r.valid ? <><span className="verdict verdict-allow">Valid</span> key <code>{r.keyId}</code></> : badSignature ? <span className="verdict verdict-deny">Does not match</span> : 'not checked'}</dd>
+        <dt>Signature</dt><dd>{r.valid || b?.status === 'invalid' ? <><span className="verdict verdict-allow">Valid</span> key <code>{r.keyId}</code></> : badSignature ? <span className="verdict verdict-deny">Does not match</span> : 'not checked'}</dd>
+        <dt>Buyer</dt><dd>{!b ? 'not checked'
+          : b.status === 'signed' ? <><span className="verdict verdict-allow">Signed</span> with their passkey, user verified</>
+          : b.status === 'unsigned' ? <><span className="verdict verdict-pending">Not signed</span> attested by this deployment only</>
+          : <><span className="verdict verdict-deny">Invalid</span> {b.reason}</>}</dd>
       </dl>
       {chainBroken && <p className="faint">{reason}.</p>}
-      <p className="faint">A valid seal proves the receipt was not altered since this Mandat deployment signed it. It does not prove that what it records is true on its own: PayPal's records of the same order (custom_id, capture, tracking) back that up.</p>
+      <p className="faint">A valid seal proves the receipt was not altered since this Mandat deployment signed it. A buyer signature proves the holder of that passkey approved this exact mandate, with Touch ID, Face ID or a PIN; Mandat never holds the key. Neither proves on its own whose passkey it is (in this demo it is not tied to an account) or that what the receipt records is true: PayPal's records of the same order (custom_id, capture, tracking) back that up.</p>
     </section>
   );
 }

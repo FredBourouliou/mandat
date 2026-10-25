@@ -5,3 +5,4 @@ export * from './execute.ts';
 export * from './paypal.ts';
 export * from './receipt-pdf.ts';
 export * from './disputes.ts';
+export * from './passkey.ts';

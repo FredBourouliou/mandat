@@ -1,6 +1,6 @@
 import 'server-only';
 import { randomBytes } from 'node:crypto';
-import { Guard, PayPalRail, type LedgerEntry, type Mandate } from '@mandat/guard';
+import { Guard, PayPalRail, type LedgerEntry, type Mandate, type MandateSignature } from '@mandat/guard';
 import { db } from './db';
 import { PUBLIC_URL, paypalCredentials } from './env';
 
@@ -15,12 +15,13 @@ export function railFor(sessionId: string): PayPalRail {
 
 const guards = new Map<string, Guard>();
 
-export function createSession(mandate: Omit<Mandate, 'id'>): string {
+/** A verified buyer signature, when given, is the ledger's second entry, right after the mandate it signs. */
+export function createSession(mandate: Mandate, signature?: MandateSignature): string {
   const id = newId('s');
-  const full: Mandate = { ...mandate, id: newId('mdt') };
-  const guard = new Guard(full, railFor(id));
+  const guard = new Guard(mandate, railFor(id));
+  if (signature) guard.record('mandate.signed', signature);
   db().prepare('INSERT INTO sessions (id, created_at, mandate, ledger) VALUES (?, ?, ?, ?)')
-    .run(id, new Date().toISOString(), JSON.stringify(full), JSON.stringify(guard.ledger.entries));
+    .run(id, new Date().toISOString(), JSON.stringify(mandate), JSON.stringify(guard.ledger.entries));
   guards.set(id, guard);
   return id;
 }

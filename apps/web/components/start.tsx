@@ -1,6 +1,7 @@
 'use client';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { forgetPasskey, hasStoredPasskey, passkeysAvailable, signMandate } from './passkey';
 
 async function post(url: string, body: unknown) {
   const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -35,24 +36,47 @@ export function MandateForm() {
   // Number fields keep the raw text, so a field can be emptied and retyped without snapping to 0.
   const [f, setF] = useState({ purpose: 'Gear for a three-day hike in the Jura', maxTotal: '200', maxPerPurchase: '130', approvalAbove: '80', maxPurchases: '4', days: '7' });
   const n = (k: Exclude<keyof typeof f, 'purpose'>) => Number(f[k] || 0);
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
+  const [canSign, setCanSign] = useState(false);
+  const [stored, setStored] = useState(false);
+  useEffect(() => { setCanSign(passkeysAvailable()); setStored(hasStoredPasskey()); }, []);
   const num = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value });
   const invalid = ([['maxTotal', 10, 200], ['maxPerPurchase', 10, 200], ['approvalAbove', 0, 200], ['maxPurchases', 1, 10], ['days', 1, 30]] as const)
     .some(([k, lo, hi]) => f[k] === '' || n(k) < lo || n(k) > hi || !Number.isInteger(n(k)));
+  const fields = () => ({
+    purpose: f.purpose, maxTotal: n('maxTotal') * 100, maxPerPurchase: n('maxPerPurchase') * 100,
+    approvalAbove: n('approvalAbove') * 100, maxPurchases: n('maxPurchases'), days: n('days'),
+  });
+  // Signed: the server fixes the mandate, the passkey signs its hash, the server checks the assertion. Unsigned: the form alone.
+  const hand = async (sign: boolean) => {
+    setError('');
+    if (invalid) { setError('Amounts go from 10 to 200 EUR (threshold from 0), 1 to 10 purchases, 1 to 30 days, whole numbers.'); return; }
+    try {
+      let id: string;
+      if (sign) {
+        setBusy('Preparing the mandate…');
+        const draft = await post('/api/mandates', fields());
+        setBusy('Waiting for your passkey…');
+        const signature = await signMandate(draft.challenge);
+        setStored(true);
+        setBusy('Checking the signature…');
+        ({ id } = await post('/api/sessions', { mandateId: draft.mandate.id, ...signature }));
+      } else {
+        setBusy('Sealing…');
+        ({ id } = await post('/api/sessions', fields()));
+      }
+      router.push(`/s/${id}`);
+    } catch (err) {
+      const name = (err as Error).name;
+      setError(name === 'NotAllowedError' || name === 'AbortError'
+        ? 'The passkey was not used (cancelled or timed out). Try again, or continue without a passkey.'
+        : (err as Error).message);
+      setBusy('');
+    }
+  };
   return (
-    <form className="deed narrow" onSubmit={async e => {
-      e.preventDefault(); setError('');
-      if (invalid) { setError('Amounts go from 10 to 200 EUR (threshold from 0), 1 to 10 purchases, 1 to 30 days, whole numbers.'); return; }
-      setBusy(true);
-      try {
-        const { id } = await post('/api/sessions', {
-          purpose: f.purpose, maxTotal: n('maxTotal') * 100, maxPerPurchase: n('maxPerPurchase') * 100,
-          approvalAbove: n('approvalAbove') * 100, maxPurchases: n('maxPurchases'), days: n('days'),
-        });
-        router.push(`/s/${id}`);
-      } catch (err) { setError((err as Error).message); setBusy(false); }
-    }}>
+    <form className="deed narrow" onSubmit={e => { e.preventDefault(); void hand(canSign); }}>
       <div className="section-head"><h2>Sign a mandate</h2><span className="faint">Merchant: Atelier Voyage · outdoor and travel</span></div>
       <label>Purpose<input value={f.purpose} onChange={e => setF({ ...f, purpose: e.target.value })} maxLength={120} required /></label>
       <div className="field-grid">
@@ -68,10 +92,16 @@ export function MandateForm() {
         {n('approvalAbove') > 0 ? ` Above ${n('approvalAbove')} EUR, PayPal asks for your approval first.` : ' Every purchase goes to PayPal for your approval.'} Nothing else can be bought.
       </p>
       <div className="btn-row">
-        <button className="btn btn-seal" disabled={busy}>{busy ? 'Sealing…' : 'Sign and hand to the agent'}</button>
-        <span className="faint">Sandbox only. Capped at 200 EUR.</span>
+        <button className="btn btn-seal" disabled={!!busy}>{busy || (canSign ? 'Sign with your passkey' : 'Hand to the agent')}</button>
+        {canSign && <button type="button" className="btn btn-quiet" disabled={!!busy} onClick={() => hand(false)}>Continue without a passkey</button>}
       </div>
+      <p className="faint">
+        {canSign
+          ? 'Touch ID, Face ID or your device PIN signs this exact mandate; Mandat never holds the key. Without a passkey, the receipt says the buyer did not sign.'
+          : 'This browser cannot use passkeys here, so the mandate will not carry your signature.'} Sandbox only. Capped at 200 EUR.
+      </p>
       {error && <p className="error" role="alert">{error}</p>}
+      {error && stored && !busy && <button type="button" className="btn btn-quiet" onClick={() => { forgetPasskey(); setStored(false); setError(''); }}>Use a new passkey next time</button>}
     </form>
   );
 }

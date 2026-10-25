@@ -63,7 +63,11 @@ export async function receiptPdf({ receipt, mandate, verifyUrl, title = 'Purchas
   line(`Mandate ${mandate.id} - ${mandate.purpose}`, { size: 11, f: bold });
   line(`Principal: ${mandate.principal}   Merchants: ${mandate.merchants.join(', ')}   Categories: ${mandate.categories.join(', ')}`, { color: MUTED });
   line(`Limits: ${formatMoney(mandate.maxPerPurchase)} per purchase, ${formatMoney(mandate.maxTotal)} in total, human approval above ${formatMoney(mandate.approvalAbove)}`, { color: MUTED });
-  line(`Valid ${mandate.validFrom} to ${mandate.validUntil}`, { color: MUTED, gap: 22 });
+  line(`Valid ${mandate.validFrom} to ${mandate.validUntil}`, { color: MUTED });
+  const signed = receipt.entries.some(e => e.type === 'mandate.signed');
+  line(signed
+    ? 'Signed by the buyer: WebAuthn passkey assertion over the mandate hash, with user verification (entry #1). Mandat never holds that key.'
+    : 'Not signed by the buyer: this mandate is attested by the Mandat deployment only.', { color: MUTED, gap: 22 });
 
   line('Event log (hash-chained)', { size: 12, f: bold, gap: 18 });
   for (const e of receipt.entries) {
@@ -90,6 +94,7 @@ function summarize(type: string, data: unknown): string {
   const money = (m?: Money) => (m ? formatMoney(m) : '');
   switch (type) {
     case 'mandate.issued': return `hash ${String(d.mandateHash).slice(0, 12)}...`;
+    case 'mandate.signed': return `buyer passkey (WebAuthn, user verified) on ${d.rpId}, credential ${String(d.credentialId).slice(0, 12)}...`;
     case 'proposal.received': return `${d.proposal?.title} x${d.proposal?.quantity} from ${d.proposal?.merchant}`;
     case 'decision': return d.kind === 'deny' ? `DENIED: ${d.reasons?.join('; ')}` : `${String(d.kind).toUpperCase()} ${money(d.amount)}`;
     case 'order.created': return `PayPal order ${d.orderId} (${d.status})`;
