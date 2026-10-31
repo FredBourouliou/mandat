@@ -16,7 +16,7 @@ export async function POST(_req: Request, ctx: { params: Promise<{ id: string; a
       case 'refresh': return NextResponse.json({ view: await refreshDispute(id) });
       case 'draft':
         if (!consume(`draft:${id}`, 4)) return NextResponse.json({ error: 'Draft limit reached for this dispute.' }, { status: 429 });
-        try { return NextResponse.json({ draft: await draftResponse(id) }); } catch (e) { return NextResponse.json({ error: claudeErrorMessage(e) }, { status: 502 }); }
+        try { return NextResponse.json({ draft: await draftResponse(id) }); } catch (e) { console.error('dispute draft failed', e); return NextResponse.json({ error: claudeErrorMessage(e) }, { status: 502 }); }
       case 'submit': {
         const { action: used } = await submitResponse(id);
         if (!used) return NextResponse.json({ error: 'PayPal has not opened a response window yet. It usually does within a minute or two.' }, { status: 409 });

@@ -91,7 +91,7 @@ export async function draftResponse(id: string): Promise<Draft> {
   const { output } = await generateText({
     model: anthropic(DRAFT_MODEL),
     output: Output.object({ schema: DraftSchema }),
-    maxOutputTokens: 1500,
+    maxOutputTokens: 4000,
     system: `You write a merchant's response to a payment dispute for PayPal reviewers. Use only facts present in the ledger below; never invent facts.
 Explain that the purchase was made by the buyer's AI agent under a signed spending mandate, that the guard checked it against the mandate,
 which human approval or payment step happened (payer id, capture), and the shipment tracking. If the buyer signature is verified, say that the exact mandate

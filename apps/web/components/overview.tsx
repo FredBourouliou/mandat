@@ -7,7 +7,7 @@ import { short, time } from './format';
 import { gridTheme } from './grids';
 
 const eur = (minor: number) => `${(minor / 100).toFixed(2)} EUR`;
-const when = (at: string) => `${at.slice(0, 10)} ${time(at)}`;
+const when = (at?: string) => (at ? `${at.slice(0, 10)} ${time(at)}` : '');
 const Verdict = ({ kind, label }: { kind: string; label: string }) => <span className={`verdict verdict-${kind}`}>{label}</span>;
 const defaults = { sortable: true, resizable: true, suppressMovable: true, filter: true };
 const authKind: Record<string, string> = { 'Passkey and PayPal': 'allow', 'Buyer in PayPal': 'pending', 'Guard, within the mandate': 'neutral' };
@@ -35,13 +35,13 @@ export function MerchantOverview({ data }: { data: Overview }) {
     { field: 'at', headerName: 'Date', width: 150, sort: 'desc', filter: 'agTextColumnFilter', valueFormatter: p => when(p.value) },
     { field: 'item', headerName: 'Item', flex: 1, minWidth: 210 },
     { field: 'minor', headerName: 'Amount', width: 120, filter: 'agNumberColumnFilter', filterValueGetter: p => (p.data?.minor ?? 0) / 100, valueFormatter: p => eur(p.value), cellClass: 'num' },
-    { field: 'authorizedBy', headerName: 'Authorized by', width: 210, cellRenderer: (p: ICellRendererParams<OverviewOrder>) => <Verdict kind={authKind[p.value] ?? 'neutral'} label={p.value} /> },
+    { field: 'authorizedBy', headerName: 'Authorized by', width: 210, cellRenderer: (p: ICellRendererParams<OverviewOrder>) => p.value ? <Verdict kind={authKind[p.value] ?? 'neutral'} label={p.value} /> : null },
     { field: 'mandate', headerName: 'Mandate', width: 112 },
     { field: 'status', headerName: 'Status', width: 150 },
-    { field: 'dispute', headerName: 'Dispute', width: 160, valueFormatter: p => p.value || '—' },
-    { field: 'payer', headerName: 'PayPal payer', width: 150, valueFormatter: p => p.value || '—', cellClass: 'mono-cell' },
+    { field: 'dispute', headerName: 'Dispute', width: 160, valueFormatter: p => (p.node?.isRowPinned() ? '' : p.value || '—') },
+    { field: 'payer', headerName: 'PayPal payer', width: 150, valueFormatter: p => (p.node?.isRowPinned() ? '' : p.value || '—'), cellClass: 'mono-cell' },
     { field: 'orderId', headerName: 'PayPal order', width: 190, cellClass: 'mono-cell' },
-    { field: 'mandateHash', headerName: 'Mandate hash', width: 140, valueFormatter: p => short(p.value, 12), cellClass: 'mono-cell' },
+    { field: 'mandateHash', headerName: 'Mandate hash', width: 140, valueFormatter: p => (p.value ? short(p.value, 12) : ''), cellClass: 'mono-cell' },
   ], []);
 
   const blockedColumns = useMemo<ColDef<OverviewBlocked>[]>(() => [
