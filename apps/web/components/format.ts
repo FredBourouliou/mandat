@@ -10,6 +10,7 @@ export function describeEntry(type: string, d: any): { label: string; detail?: s
   switch (type) {
     case 'mandate.issued': return { label: 'Mandate issued', detail: d.mandate?.purpose };
     case 'mandate.signed': return { label: 'The mandate was signed with a passkey', detail: `User verification reported by the authenticator · credential ${short(String(d.credentialId), 10)}`, verdict: ['allow', 'Signed'] };
+    case 'approval.signed': return { label: 'The passkey signed this PayPal order', detail: `Order ${d.orderId}: same key as the mandate` };
     case 'proposal.received': return { label: `Agent proposed ${d.proposal?.title} ×${d.proposal?.quantity}`, detail: `${money(d.proposal?.unitPrice)} each, sold by ${d.proposal?.merchant}. “${d.proposal?.reason}”` };
     case 'decision':
       if (d.kind === 'deny') return { label: 'Guard refused', detail: d.reasons?.join('; '), verdict: ['deny', 'Blocked'] };

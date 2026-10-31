@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { formatMoney, sha256Hex, type Proposal } from '@mandat/guard';
 import { searchCatalog, findProduct } from './catalog';
 import { guardFor, logAgent, saveLedger } from './store';
+import { PUBLIC_URL } from './env';
 import { ship } from './merchant';
 import { claudeErrorMessage } from './errors';
 
@@ -36,6 +37,12 @@ export interface ScriptedProposal { sku: string; quantity: number }
  * The same item and quantity proposed twice in one run is a retry: same proposal id, so the guard never pays twice,
  * and the agent is told so plainly instead of being shown the first purchase again as if it were a new one.
  */
+/** On a signed mandate the agent gets the run page, where the passkey signs the order first; otherwise the PayPal link. */
+function approvalTarget(sessionId: string, approveUrl?: string) {
+  const signed = guardFor(sessionId)?.ledger.entries.some(e => e.type === 'mandate.signed');
+  return signed ? { approvePage: `${PUBLIC_URL}/s/${encodeURIComponent(sessionId)}` } : { approveUrl };
+}
+
 export function proposer(sessionId: string, runId: string) {
   return async ({ sku, quantity, reason }: { sku: string; quantity: number; reason: string }) => {
     const guard = guardFor(sessionId);
@@ -49,7 +56,7 @@ export function proposer(sessionId: string, runId: string) {
       const RETRY = 'Proposing the same item and quantity again in one run is a retry: no new order was created. To buy more units, propose a larger quantity once.';
       const order = guard.orders.find(o => o.proposal.id === id);
       if (order?.state === 'paid') return { status: 'already bought in this run', amount: formatMoney(order.amount), note: RETRY };
-      if (order?.state === 'awaiting_approval') return { status: 'already proposed, waiting for the person to approve in PayPal', amount: formatMoney(order.amount), approveUrl: order.approveUrl, note: RETRY };
+      if (order?.state === 'awaiting_approval') return { status: 'already proposed, waiting for the person to approve in PayPal', amount: formatMoney(order.amount), ...approvalTarget(sessionId, order.approveUrl), note: RETRY };
       const decision = guard.ledger.entries[earlier + 1];
       const failed = guard.ledger.entries.some(e => e.type === 'order.failed' && (e.data as { proposalId?: string }).proposalId === id);
       if (!failed) return { status: 'already refused by the guard in this run', reasons: (decision?.data as { reasons?: string[] })?.reasons ?? [], note: RETRY };
@@ -68,7 +75,7 @@ export function proposer(sessionId: string, runId: string) {
     }
     switch (outcome.status) {
       case 'paid': return { status: 'paid', amount: formatMoney(outcome.amount) };
-      case 'awaiting_approval': return { status: 'waiting for the person to approve in PayPal', amount: formatMoney(outcome.amount), why: outcome.reasons, approveUrl: outcome.approveUrl };
+      case 'awaiting_approval': return { status: 'waiting for the person to approve in PayPal', amount: formatMoney(outcome.amount), why: outcome.reasons, ...approvalTarget(sessionId, outcome.approveUrl) };
       case 'denied': return { status: 'refused by the guard', reasons: outcome.reasons };
       case 'failed': return { status: 'payment failed', reason: outcome.reason };
     }

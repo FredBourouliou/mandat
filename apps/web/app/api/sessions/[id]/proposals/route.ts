@@ -6,7 +6,7 @@ import { proposer } from '@/lib/agent';
 import { agentEvents, getSession, logAgent } from '@/lib/store';
 
 const Body = z.object({
-  run: z.string().regex(/^mcp_[a-z0-9]{8,24}$/),
+  run: z.string().regex(/^(mcp|atk)_[a-z0-9]{8,24}$/),
   client: z.string().trim().max(60).optional(),
   sku: z.string().max(60),
   quantity: z.number().int().min(1).max(10),
@@ -28,7 +28,9 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   }
   const { run, client, ...proposal } = parsed.data;
   if (!agentEvents(id).some(e => e.runId === run)) {
-    logAgent(id, run, 'task', { task: `${client || 'An external agent'} connected over MCP. It can only propose; the guard decides.`, source: 'mcp' });
+    logAgent(id, run, 'task', run.startsWith('atk_')
+      ? { task: 'Hijacked agent, no model in the loop: it sends the guard exactly what the hidden instructions ask for.', source: 'attack' }
+      : { task: `${client || 'An external agent'} connected over MCP. It can only propose; the guard decides.`, source: 'mcp' });
   }
   return NextResponse.json(await proposer(id, run)(proposal));
 }

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { buyerSignature, verifyReceipt, type SealedReceipt } from '@mandat/guard';
+import { buyerSignature, keyAnchored, payerLinks, verifyReceipt, type SealedReceipt } from '@mandat/guard';
 import { SIGNER, signingKey } from '@/lib/env';
 
 /** Verifies a sealed receipt against this deployment's public key, and the buyer's passkey signature on the mandate. */
@@ -18,7 +18,10 @@ export async function POST(req: Request) {
     if (!seal.valid) return NextResponse.json({ ...seal, seal: false, keyId: key.keyId, entries: receipt.entries.length });
     const buyer = buyerSignature(receipt.entries, receipt.mandateHash, SIGNER);
     const result = seal.valid && buyer.status === 'invalid' ? { valid: false, reason: `buyer signature: ${buyer.reason}` } : seal;
-    return NextResponse.json({ ...result, seal: seal.valid, buyer, keyId: key.keyId, entries: receipt.entries.length });
+    const payers = payerLinks(receipt.entries, receipt.mandateHash, SIGNER);
+    const bad = payers.find(p => p.status === 'invalid');
+    const final = result.valid && bad?.status === 'invalid' ? { valid: false, reason: `order approval: ${bad.reason}` } : result;
+    return NextResponse.json({ ...final, seal: seal.valid, buyer, payers, anchor: keyAnchored(receipt.entries, receipt.mandateHash), keyId: key.keyId, entries: receipt.entries.length });
   } catch {
     return NextResponse.json({ valid: false, reason: 'malformed receipt' });
   }

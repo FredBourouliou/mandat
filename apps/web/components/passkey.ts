@@ -52,6 +52,21 @@ export async function signMandate(challenge: string) {
   };
 }
 
+/** Signs one order with the passkey that signed the mandate, on this device or synced to it. */
+export async function signOrder(challenge: string, credentialId: string) {
+  const cred = await navigator.credentials.get({
+    publicKey: {
+      challenge: fromB64u(challenge),
+      allowCredentials: [{ type: 'public-key', id: fromB64u(credentialId) }],
+      userVerification: 'required',
+      timeout: 120_000,
+    },
+  }) as PublicKeyCredential | null;
+  const res = cred?.response as AuthenticatorAssertionResponse | undefined;
+  if (!res) throw new Error('No signature returned.');
+  return { authenticatorData: b64u(res.authenticatorData), clientDataJSON: b64u(res.clientDataJSON), signature: b64u(res.signature) };
+}
+
 export const hasStoredPasskey = () => load() !== null;
 /** A cancelled prompt and a passkey deleted from the device look the same to the page, so only the user resets it. */
 export const forgetPasskey = () => save(null);

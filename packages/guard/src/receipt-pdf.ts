@@ -77,7 +77,7 @@ export async function receiptPdf({ receipt, mandate, verifyUrl, title = 'Purchas
 
   y -= 10;
   line('Seal', { size: 12, f: bold, gap: 18 });
-  line(`Mandate hash (also stored by PayPal as the order custom_id): ${receipt.mandateHash}`, { size: 8, f: mono });
+  line(`Mandate hash (also stored by PayPal in the order custom_id): ${receipt.mandateHash}`, { size: 8, f: mono });
   line(`Head: ${receipt.head}`, { size: 8, f: mono });
   line(`Ed25519 signature (key ${receipt.keyId}): ${receipt.signature}`, { size: 7, f: mono, gap: 18 });
   line(`Verify: ${verifyUrl}  - the signed receipt is attached to this PDF as receipt.json.`, { color: MUTED });
@@ -97,6 +97,7 @@ function summarize(type: string, data: unknown): string {
     case 'mandate.signed': return `passkey (WebAuthn, user-verification flag set) on ${d.rpId}, credential ${String(d.credentialId).slice(0, 12)}...`;
     case 'proposal.received': return `${d.proposal?.title} x${d.proposal?.quantity} from ${d.proposal?.merchant}`;
     case 'decision': return d.kind === 'deny' ? `DENIED: ${d.reasons?.join('; ')}` : `${String(d.kind).toUpperCase()} ${money(d.amount)}`;
+    case 'approval.signed': return `passkey signed PayPal order ${d.orderId}`;
     case 'order.created': return `PayPal order ${d.orderId} (${d.status})`;
     case 'order.captured': return `captured ${d.captureId ?? ''} payer ${d.payerId ?? ''}`;
     case 'shipment.tracked': return `${d.carrier ?? ''} ${d.trackingNumber ?? ''}`;

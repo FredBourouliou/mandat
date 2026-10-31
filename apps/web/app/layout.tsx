@@ -22,6 +22,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <nav aria-label="Main">
               <Link href="/">New mandate</Link>
               <Link href="/verify">Verify a receipt</Link>
+              <Link href="/merchant">Merchant back office</Link>
             </nav>
             <span className="sandbox-tag">PayPal sandbox · no real money</span>
           </div>

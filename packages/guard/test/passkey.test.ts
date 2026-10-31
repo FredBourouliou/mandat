@@ -1,7 +1,7 @@
 import { createHash, generateKeyPairSync, sign, type KeyObject } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import {
-  Guard, buyerSignature, mandateChallenge, mandateHash, verifyMandateSignature,
+  Guard, anchorFor, approvalHash, buyerSignature, keyAnchored, mandateChallenge, mandateHash, payerLinks, verifyApproval, verifyMandateSignature,
   type Mandate, type MandateSignature, type PaymentRail,
 } from '../src/index.ts';
 
@@ -117,5 +117,61 @@ describe('buyer signature in the ledger', () => {
     const g = new Guard(swapped, rail);
     g.record('mandate.signed', authenticator().assert(HASH));
     expect(buyerSignature(g.ledger.entries, HASH).status).toBe('invalid');
+  });
+});
+
+describe('passkey anchored at PayPal and linked to the payer', () => {
+  const expected = { origin: ORIGIN, rpId: RP };
+  const proposal = { id: 'p1', mandateId: mandate.id, merchant: 'atelier-voyage', sku: 's', title: 'Jacket', category: 'outdoor', quantity: 1, unitPrice: eur(11900), reason: 'r' };
+  function signedRun(key = authenticator()) {
+    const created: string[] = [];
+    const approvalRail: PaymentRail = {
+      async createOrder(i) { created.push(i.customId); return { orderId: 'O1', status: 'PAYER_ACTION_REQUIRED', approveUrl: 'https://paypal.example/a' }; },
+      async captureOrder() { return { status: 'COMPLETED', captureId: 'C1', payerId: 'PAYER1' }; },
+    };
+    const g = new Guard(mandate, approvalRail, () => new Date('2026-10-31T00:00:00Z'));
+    const sig = key.assert(HASH);
+    g.record('mandate.signed', sig);
+    return { g, key, sig, created };
+  }
+  const hashFor = (orderId = 'O1', minor = 11900) => approvalHash({ mandateHash: HASH, orderId, amount: eur(minor) });
+
+  it('puts the passkey fingerprint in the custom_id of a signed mandate', async () => {
+    const { g, sig, created } = signedRun();
+    await g.submit(proposal);
+    expect(created[0]).toBe(anchorFor(HASH, sig.publicKey));
+    expect(created[0]!.startsWith(HASH)).toBe(true);
+    expect(created[0]!.length).toBeLessThanOrEqual(127);
+    expect(keyAnchored(g.ledger.entries, HASH)).toBe('anchored');
+  });
+
+  it('notices an order that does not carry the key that signed the mandate', async () => {
+    const { g } = signedRun();
+    await g.submit(proposal);
+    const swapped = g.ledger.entries.map(e => e.type === 'mandate.signed' ? { ...e, data: authenticator().assert(HASH) } : e);
+    expect(keyAnchored(swapped, HASH)).toBe('not_anchored');
+  });
+
+  it('links the passkey to the payer PayPal reports for the order it signed', async () => {
+    const { g, key } = signedRun();
+    await g.submit(proposal);
+    g.record('approval.signed', { orderId: 'O1', signature: key.assert(hashFor()) });
+    await g.completeApproval('p1');
+    expect(payerLinks(g.ledger.entries, HASH, expected)).toMatchObject([{ orderId: 'O1', status: 'linked', payerId: 'PAYER1' }]);
+  });
+
+  it('rejects an order approval signed by another key', async () => {
+    const { g } = signedRun();
+    await g.submit(proposal);
+    const r = verifyApproval(g.ledger.entries, HASH, { orderId: 'O1', signature: authenticator().assert(hashFor()) }, expected);
+    expect(r).toEqual({ valid: false, reason: 'signed by another key than the mandate' });
+  });
+
+  it('rejects a signature over another amount or another order', async () => {
+    const { g, key } = signedRun();
+    await g.submit(proposal);
+    expect(verifyApproval(g.ledger.entries, HASH, { orderId: 'O1', signature: key.assert(hashFor('O1', 1)) }, expected).valid).toBe(false);
+    expect(verifyApproval(g.ledger.entries, HASH, { orderId: 'O1', signature: key.assert(hashFor('O2')) }, expected).valid).toBe(false);
+    expect(verifyApproval(g.ledger.entries, HASH, { orderId: 'O9', signature: key.assert(hashFor('O9')) }, expected)).toEqual({ valid: false, reason: 'unknown order' });
   });
 });

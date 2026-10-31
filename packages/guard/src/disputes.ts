@@ -35,6 +35,7 @@ export async function getDispute(client: PayPalClient, id: string): Promise<Disp
 
 /**
  * Sandbox-only: makes PayPal open a card chargeback on a capture, as a cardholder's bank would.
+ * Reason code 1010 is reported by PayPal as UNAUTHORISED (tested on the sandbox; 1330 gives NOT_AS_DESCRIBED).
  * Returns the dispute id at once; the CUSTOMER.DISPUTE.CREATED webhook follows about 3 minutes later.
  */
 export async function simulateChargeback(client: PayPalClient, captureId: string, amount: Money): Promise<string> {
@@ -51,7 +52,7 @@ export async function simulateChargeback(client: PayPalClient, captureId: string
       receive_date: now.toISOString(), money_movement_date: now.toISOString(),
       response_date: new Date(now.getTime() + 10 * 864e5).toISOString(),
       event_code: 'CHARGEBACK_INITIATED', event_type: 'DEBIT', chargeback_type: 'REPORTED_TO_PROCESSOR',
-      processor_info: { reference_number: `${now.getTime()}0000000000`, reason_code: '1330', notes: 'Cardholder does not recognise the purchase' },
+      processor_info: { reference_number: `${now.getTime()}0000000000`, reason_code: '1010', notes: 'Cardholder does not recognise the purchase' },
     },
   });
   return r.dispute_id as string;

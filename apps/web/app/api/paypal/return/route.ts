@@ -23,6 +23,11 @@ export async function GET(req: Request) {
     }
     return NextResponse.redirect(`${back}?approval=cancelled`);
   }
+  // On a signed mandate, a PayPal approval alone does not capture: the passkey must have signed this order first.
+  const entries = guard.ledger.entries;
+  if (entries.some(e => e.type === 'mandate.signed') && !entries.some(e => e.type === 'approval.signed' && (e.data as { orderId?: string }).orderId === orderId)) {
+    return NextResponse.redirect(`${back}?approval=unsigned`);
+  }
   const outcome = await guard.completeApproval(order.proposal.id).catch(e => ({ status: 'failed' as const, reason: String(e) }));
   saveLedger(sessionId, guard);
   if (outcome.status === 'paid' && outcome.captureId) await ship(sessionId, guard, outcome.orderId, outcome.captureId).catch(() => undefined);

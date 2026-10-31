@@ -87,7 +87,7 @@ export async function draftResponse(id: string): Promise<Draft> {
   const view = row.view ? (JSON.parse(row.view) as DisputeView) : null;
   const buyer = buyerSignature(receipt.entries, receipt.mandateHash, SIGNER);
   // The passkey assertion is binary noise to a reader: Claude gets the verified result instead.
-  const entries = receipt.entries.map(e => `#${e.seq} ${e.at} ${e.type} ${e.type === 'mandate.signed' ? JSON.stringify({ rpId: (e.data as any).rpId, credentialId: (e.data as any).credentialId }) : JSON.stringify(e.data)}`).join('\n');
+  const entries = receipt.entries.map(e => `#${e.seq} ${e.at} ${e.type} ${e.type === 'approval.signed' ? JSON.stringify({ orderId: (e.data as any).orderId, verified: true }) : e.type === 'mandate.signed' ? JSON.stringify({ rpId: (e.data as any).rpId, credentialId: (e.data as any).credentialId }) : JSON.stringify(e.data)}`).join('\n');
   const { output } = await generateText({
     model: anthropic(DRAFT_MODEL),
     output: Output.object({ schema: DraftSchema }),
@@ -95,11 +95,11 @@ export async function draftResponse(id: string): Promise<Draft> {
     system: `You write a merchant's response to a payment dispute for PayPal reviewers. Use only facts present in the ledger below; never invent facts.
 Explain that the purchase was made by the buyer's AI agent under a signed spending mandate, that the guard checked it against the mandate,
 which human approval or payment step happened (payer id, capture), and the shipment tracking. If the buyer signature is verified, say that the exact mandate
-was signed with a passkey (WebAuthn assertion, user-verification flag set by the authenticator) before the agent could spend; if unsigned, do not claim it. Never say whose passkey it is, and never write "their own passkey": the receipt does not prove the holder's identity. Mention that the receipt is hash-chained and signed (Ed25519)
+was signed with a passkey (WebAuthn assertion, user-verification flag set by the authenticator) before the agent could spend; if unsigned, do not claim it. If the ledger has an approval.signed entry, say that the same passkey signed that PayPal order and that PayPal reports its payer id. Never say whose passkey it is, and never write "their own passkey": the receipt does not prove the holder's identity. Mention that the receipt is hash-chained and signed (Ed25519)
 and can be verified at ${PUBLIC_URL}/verify. Be concise and factual.`,
     prompt: `Dispute ${id}: stage ${view?.stage ?? 'CHARGEBACK'}, reason ${view?.reason ?? 'unknown'}, amount ${view?.amount ? formatMoney(view.amount) : 'n/a'}.
 Disputed PayPal order ${row.order_id}, capture ${row.capture_id}.
-Mandate hash (stored by PayPal as the order custom_id): ${guard.hash}. Receipt signature valid: ${valid}.
+Mandate hash (stored by PayPal at the start of each order custom_id, followed on a signed mandate by the passkey's fingerprint): ${guard.hash}. Receipt signature valid: ${valid}.
 Buyer signature on the mandate: ${buyer.status === 'signed' ? 'verified passkey assertion (user-verification flag set)' : buyer.status === 'unsigned' ? 'none (unsigned mandate)' : `invalid (${buyer.reason})`}.
 
 Ledger:

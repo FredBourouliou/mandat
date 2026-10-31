@@ -1,5 +1,5 @@
 import 'server-only';
-import { buyerSignature, mandateHash, type Mandate } from '@mandat/guard';
+import { approvalHash, buyerSignature, mandateChallenge, mandateHash, type Mandate } from '@mandat/guard';
 import { agentEvents, getSession, guardFor } from './store';
 import { disputesFor } from './disputes';
 import { SIGNER } from './env';
@@ -12,15 +12,23 @@ export function sessionState(id: string) {
   const guard = guardFor(id);
   if (!row || !guard) return null;
   const mandate = JSON.parse(row.mandate) as Mandate;
+  const buyer = buyerSignature(guard.ledger.entries, guard.hash, SIGNER);
+  const signedOrders = new Set(guard.ledger.entries.filter(e => e.type === 'approval.signed').map(e => (e.data as { orderId: string }).orderId));
+  // On a signed mandate the PayPal link appears only once the passkey has signed that exact order.
+  const orders = guard.orders.map((o): (typeof guard.orders)[number] & { approvalChallenge?: string } => (
+    o.state === 'awaiting_approval' && buyer.status === 'signed' && !signedOrders.has(o.orderId)
+      ? { ...o, approveUrl: undefined, approvalChallenge: mandateChallenge(approvalHash({ mandateHash: guard.hash, orderId: o.orderId, amount: o.amount })) }
+      : o
+  ));
   return {
     id,
     createdAt: row.created_at,
     mandate,
     mandateHash: mandateHash(mandate),
-    buyer: buyerSignature(guard.ledger.entries, guard.hash, SIGNER),
+    buyer,
     spent: guard.spent,
     ledger: guard.ledger.entries,
-    orders: guard.orders,
+    orders,
     agent: agentEvents(id),
     running: running.has(id),
     disputes: disputesFor(id).map(d => ({

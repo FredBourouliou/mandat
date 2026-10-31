@@ -97,6 +97,7 @@ server.registerTool('propose_purchase', {
     const client = server.server.getClientVersion()?.name;
     const r = await api('POST', `/api/sessions/${SID}/proposals`, { run: RUN, client, sku, quantity, reason });
     if (r.approveUrl) r.next = `Give the person this PayPal link to approve: ${r.approveUrl}`;
+    if (r.approvePage) r.next = `Ask the person to open ${r.approvePage}: their passkey signs this order, then PayPal asks them to approve.`;
     return text(r);
   } catch (e) { return failure(e); }
 });

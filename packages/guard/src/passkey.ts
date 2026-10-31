@@ -1,5 +1,6 @@
 import { createHash, createPublicKey, verify, type KeyObject } from 'node:crypto';
 import { hashOf } from './canonical.ts';
+import type { Money } from './mandate.ts';
 import type { LedgerEntry } from './receipt.ts';
 
 /**
@@ -80,6 +81,78 @@ export function verifyMandateSignature(sig: MandateSignature, mandateHash: strin
   } catch {
     return { valid: false, reason: 'malformed signature record' };
   }
+}
+
+/** Short fingerprint of a passkey's public key. */
+export function keyTag(publicKey: string): string {
+  return createHash('sha256').update(b64(publicKey)).digest('hex').slice(0, 32);
+}
+
+/**
+ * What goes into each order's `custom_id` once a mandate is signed: the mandate hash and the key's
+ * fingerprint. PayPal keeps it from the moment of the order, so the key cannot be swapped afterwards,
+ * for example once a dispute has been opened.
+ */
+export function anchorFor(mandateHash: string, publicKey: string): string {
+  return `${mandateHash}.${keyTag(publicKey)}`;
+}
+
+/** The hash a passkey signs to approve one order: this mandate, this PayPal order, this amount. */
+export function approvalHash(input: { mandateHash: string; orderId: string; amount: Money }): string {
+  return hashOf({ purpose: 'mandat.order-approval', mandateHash: input.mandateHash, orderId: input.orderId, amount: input.amount });
+}
+
+export interface ApprovalSignature { orderId: string; signature: MandateSignature }
+
+/**
+ * For one order above the threshold: the mandate's passkey signed this exact order, and PayPal
+ * reported who approved it. `signed` means the capture has not happened yet.
+ */
+export type PayerLink =
+  | { orderId: string; status: 'linked'; payerId: string; signedAt: string }
+  | { orderId: string; status: 'signed'; signedAt: string }
+  | { orderId: string; status: 'invalid'; reason: string };
+
+/** The amount the guard decided for an order: the `decision` entry just before its `order.created`. */
+function decidedAmount(entries: LedgerEntry[], orderId: string): Money | undefined {
+  const at = entries.findIndex(e => e.type === 'order.created' && (e.data as { orderId?: string }).orderId === orderId);
+  for (let i = at - 1; i >= 0; i--) {
+    const e = entries[i]!;
+    if (e.type === 'decision') return (e.data as { amount?: Money }).amount;
+  }
+  return undefined;
+}
+
+/** Checks one order approval against the key that signed the mandate. */
+export function verifyApproval(entries: LedgerEntry[], mandateHash: string, a: ApprovalSignature, expected: ExpectedSigner = {}): { valid: true } | { valid: false; reason: string } {
+  const mandateSig = entries.find(e => e.type === 'mandate.signed')?.data as MandateSignature | undefined;
+  if (!mandateSig) return { valid: false, reason: 'the mandate is not signed' };
+  if (a?.signature?.publicKey !== mandateSig.publicKey || a.signature.credentialId !== mandateSig.credentialId) {
+    return { valid: false, reason: 'signed by another key than the mandate' };
+  }
+  const amount = decidedAmount(entries, a.orderId);
+  if (!amount) return { valid: false, reason: 'unknown order' };
+  return verifyMandateSignature(a.signature, approvalHash({ mandateHash, orderId: a.orderId, amount }), expected);
+}
+
+/** Every signed order approval in a ledger, with the payer PayPal reported for it. */
+export function payerLinks(entries: LedgerEntry[], mandateHash: string, expected: ExpectedSigner = {}): PayerLink[] {
+  return entries.filter(e => e.type === 'approval.signed').map(e => {
+    const a = e.data as ApprovalSignature;
+    const r = verifyApproval(entries, mandateHash, a, expected);
+    if (!r.valid) return { orderId: a.orderId, status: 'invalid', reason: r.reason };
+    const payerId = entries.filter(x => x.type === 'order.captured').map(x => x.data as { orderId?: string; payerId?: string }).find(d => d.orderId === a.orderId)?.payerId;
+    return payerId ? { orderId: a.orderId, status: 'linked', payerId, signedAt: e.at } : { orderId: a.orderId, status: 'signed', signedAt: e.at };
+  });
+}
+
+/** Whether every order of a signed mandate carries that key's fingerprint in its `custom_id`. */
+export function keyAnchored(entries: LedgerEntry[], mandateHash: string): 'anchored' | 'not_anchored' | 'no_orders' | 'unsigned' {
+  const sig = entries.find(e => e.type === 'mandate.signed')?.data as MandateSignature | undefined;
+  if (!sig) return 'unsigned';
+  const orders = entries.filter(e => e.type === 'order.created').map(e => e.data as { customId?: string });
+  if (!orders.length) return 'no_orders';
+  return orders.every(o => o.customId === anchorFor(mandateHash, sig.publicKey)) ? 'anchored' : 'not_anchored';
 }
 
 /**

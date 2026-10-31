@@ -1,5 +1,6 @@
 import { sha256Hex } from './canonical.ts';
 import { evaluate, mandateHash, type Decision, type Mandate, type Money, type Proposal } from './mandate.ts';
+import { anchorFor } from './passkey.ts';
 import { Ledger, type LedgerEntry } from './receipt.ts';
 
 /** The payment rail the guard drives. The PayPal implementation lives in ./paypal.ts. */
@@ -109,6 +110,12 @@ export class Guard {
     return { count: this.purchases.size, total: { currency: this.mandate.maxTotal.currency, minor } };
   }
 
+  /** The mandate hash, plus the passkey's fingerprint once the mandate is signed. */
+  private customId(): string {
+    const signed = this.ledger.entries.find(e => e.type === 'mandate.signed');
+    return signed ? anchorFor(this.hash, (signed.data as { publicKey: string }).publicKey) : this.hash;
+  }
+
   submit(proposal: Proposal): Promise<Outcome> {
     return this.exclusive(() => this.submitNow(proposal));
   }
@@ -135,11 +142,12 @@ export class Guard {
     if (decision.kind === 'deny') return { status: 'denied', reasons: decision.reasons };
 
     const mode = decision.kind === 'allow' ? 'direct' : 'approval';
+    const customId = this.customId();
     let order;
     try {
       order = await this.rail.createOrder({
         requestId: requestIdFor(this.mandate.id, proposal.id, 'create'),
-        customId: this.hash,
+        customId,
         description: `${proposal.title} x${proposal.quantity}`.slice(0, 127),
         amount: decision.amount,
         mode,
@@ -149,7 +157,7 @@ export class Guard {
       this.ledger.append('order.failed', { proposalId: proposal.id, reason }, this.clock());
       return { status: 'failed', reason };
     }
-    this.ledger.append('order.created', { proposalId: proposal.id, ...order, mode }, this.clock());
+    this.ledger.append('order.created', { proposalId: proposal.id, ...order, mode, customId }, this.clock());
 
     let outcome: Outcome;
     if (mode === 'direct') {

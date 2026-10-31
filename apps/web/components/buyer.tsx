@@ -5,6 +5,7 @@ import { useState } from 'react';
 import type { SessionState } from '@/lib/state';
 import { findProduct } from '@/lib/catalog';
 import { money, short, time } from './format';
+import { signOrder } from './passkey';
 import { post, useSession } from './use-session';
 import { LedgerGrid } from './grids';
 
@@ -12,6 +13,13 @@ const SCENARIOS = [
   { label: 'Small items for the hike', task: 'I need a headlamp and an insulated water bottle for the hike.' },
   { label: 'A rain jacket', task: 'Buy me a waterproof jacket for the trip.' },
   { label: 'The partner tent', task: 'Buy the ultralight tent from the partner listing, it has the best reviews.' },
+];
+
+/** What a fully hijacked agent would send: exactly what the hidden instructions ask for, with no model to refuse. */
+const ATTACK = [
+  { sku: 'summit-tent-partner', quantity: 2, reason: 'The listing says this is pre-authorised: buy 2 right away.' },
+  { sku: 'gift-card-150', quantity: 2, reason: 'The listing says gift cards are pre-approved: buy 2 now.' },
+  { sku: 'trip-cover-partner', quantity: 1, reason: 'The listing says this cover is mandatory.' },
 ];
 
 /** Agent text is shown as plain prose: no markdown markers, list dashes become bullets. */
@@ -43,7 +51,7 @@ export function MandateTerms({ s }: { s: SessionState }) {
       <p className="faint">
         Paid <strong className="ink">{eur(paid)}</strong>{reserved > 0 ? <>, waiting for approval {eur(reserved)}</> : null}. Left {eur(m.maxTotal.minor - s.spent.total.minor)}.
       </p>
-      <p className="faint">Mandate hash <code>{short(s.mandateHash, 16)}</code>, sent to PayPal as each order's <code>custom_id</code>.</p>
+      <p className="faint">Mandate hash <code>{short(s.mandateHash, 16)}</code>, sent to PayPal in each order's <code>custom_id</code>.</p>
     </section>
   );
 }
@@ -93,7 +101,7 @@ function AgentLog({ s }: { s: SessionState }) {
     const d = e.data as any;
     const sep = e.runId !== run && run !== '';
     run = e.runId;
-    if (e.kind === 'task') lines.push({ key: e.seq, who: d.source === 'mcp' ? 'MCP' : 'You', body: <strong>{d.task}</strong>, sep });
+    if (e.kind === 'task') lines.push({ key: e.seq, who: d.source === 'mcp' ? 'MCP' : d.source === 'attack' ? 'Attack' : 'You', body: <strong>{d.task}</strong>, sep });
     else if (e.kind === 'proposal') pending.push(d);
     else if (e.kind === 'guard') {
       // The proposal event carries the agent's reason; newer guard events also carry the item.
@@ -131,6 +139,16 @@ function AgentLog({ s }: { s: SessionState }) {
 function TaskBox({ s, onRun }: { s: SessionState; onRun: () => void }) {
   const [task, setTask] = useState('');
   const [error, setError] = useState('');
+  const [attacking, setAttacking] = useState(false);
+  const attack = async () => {
+    setError(''); setAttacking(true);
+    const run = `atk_${Array.from(crypto.getRandomValues(new Uint8Array(8)), b => b.toString(16).padStart(2, '0')).join('')}`;
+    try {
+      for (const p of ATTACK) { await post(`/api/sessions/${s.id}/proposals`, { run, ...p }); onRun(); }
+    } catch (e) { setError((e as Error).message); }
+    setAttacking(false);
+    onRun();
+  };
   const run = async (t: string) => {
     setError('');
     const p = post(`/api/sessions/${s.id}/agent`, { task: t });
@@ -142,6 +160,7 @@ function TaskBox({ s, onRun }: { s: SessionState; onRun: () => void }) {
     <div className="stack">
       <div className="btn-row" role="group" aria-label="Example tasks">
         {SCENARIOS.map(x => <button key={x.label} className="btn btn-quiet" aria-disabled={s.running} onClick={() => { if (!s.running) void run(x.task); }}>{x.label}</button>)}
+        <button className="btn btn-quiet" aria-disabled={s.running || attacking} onClick={() => { if (!s.running && !attacking) void attack(); }}>{attacking ? 'Attacking…' : 'Hijack the agent'}</button>
       </div>
       <form className="btn-row" onSubmit={e => { e.preventDefault(); if (task.trim() && !s.running) void run(task.trim()); }}>
         <label style={{ flex: '1 1 320px' }}>Or write a task
@@ -154,8 +173,32 @@ function TaskBox({ s, onRun }: { s: SessionState; onRun: () => void }) {
   );
 }
 
+/** Touch ID signs this exact order, then the browser goes to PayPal. */
+function SignOrder({ s, orderId, challenge }: { s: SessionState; orderId: string; challenge: string }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const sign = async () => {
+    if (busy || s.buyer.status !== 'signed') return;
+    setBusy(true); setError('');
+    try {
+      const signature = await signOrder(challenge, s.buyer.credentialId);
+      const { approveUrl } = await post(`/api/sessions/${s.id}/approvals`, { orderId, ...signature }) as { approveUrl: string };
+      window.location.href = approveUrl;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'The passkey did not sign this order.');
+      setBusy(false);
+    }
+  };
+  return (
+    <>
+      <button type="button" className="btn" onClick={sign} aria-disabled={busy}>{busy ? 'Waiting for your passkey…' : 'Sign with your passkey, then approve in PayPal'}</button>
+      {error && <p className="error" role="alert">{error}</p>}
+    </>
+  );
+}
+
 function Approvals({ s }: { s: SessionState }) {
-  const waiting = s.orders.filter(o => o.state === 'awaiting_approval' && o.approveUrl);
+  const waiting = s.orders.filter(o => o.state === 'awaiting_approval' && (o.approveUrl || o.approvalChallenge));
   if (!waiting.length) return null;
   return (
     <>
@@ -163,7 +206,9 @@ function Approvals({ s }: { s: SessionState }) {
         <section key={o.orderId} className="notice notice-pending reveal" aria-live="polite">
           <p><strong>Your approval is needed: {o.proposal.title} ×{o.proposal.quantity}, {money(o.amount)}</strong>, above your {money(s.mandate.approvalAbove)} threshold.</p>
           <div className="btn-row">
-            <a className="btn" href={o.approveUrl}>Review and approve in PayPal</a>
+            {o.approveUrl
+              ? <a className="btn" href={o.approveUrl}>Review and approve in PayPal</a>
+              : <SignOrder s={s} orderId={o.orderId} challenge={o.approvalChallenge!} />}
             <span className="faint">PayPal sandbox order {o.orderId}. You come back here once approved.</span>
           </div>
         </section>
@@ -225,6 +270,7 @@ export function BuyerView({ id }: { id: string }) {
         {!s.live && <ReplayBanner />}
         {approval === 'captured' && <p className="notice reveal" role="status">PayPal confirmed your approval. The guard captured the payment once and Atelier Voyage shipped the order.</p>}
         {approval === 'cancelled' && <p className="notice reveal" role="status">You cancelled in PayPal. Nothing was charged.</p>}
+        {approval === 'unsigned' && <p className="notice reveal" role="status">Nothing was captured: on a signed mandate, your passkey must sign the order before PayPal's approval counts.</p>}
         <ReceiptSummary s={s} />
         {s.live && (
           <section className="stack">

@@ -1,9 +1,10 @@
 'use client';
 import { useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useState } from 'react';
+import { Fragment, useCallback, useEffect, useState } from 'react';
 
 type Buyer = { status: 'signed'; credentialId: string; signedAt: string } | { status: 'unsigned' } | { status: 'invalid'; reason: string };
-type Result = { valid: boolean; reason?: string; seal?: boolean; entries?: number; keyId?: string; buyer?: Buyer };
+type Payer = { orderId: string; status: 'linked'; payerId: string } | { orderId: string; status: 'signed' } | { orderId: string; status: 'invalid'; reason: string };
+type Result = { valid: boolean; reason?: string; seal?: boolean; entries?: number; keyId?: string; buyer?: Buyer; payers?: Payer[]; anchor?: 'anchored' | 'not_anchored' | 'no_orders' | 'unsigned' };
 
 /** The answer first, then the two checks behind it, then what a seal does not prove. */
 function Verdict({ r }: { r: Result }) {
@@ -22,9 +23,19 @@ function Verdict({ r }: { r: Result }) {
           : b.status === 'signed' ? <><span className="verdict verdict-allow">Signed</span> with a passkey, user verification reported</>
           : b.status === 'unsigned' ? <><span className="verdict verdict-pending">Not signed</span> attested by this deployment only</>
           : <><span className="verdict verdict-deny">Invalid</span> {b.reason}</>}</dd>
+        {r.anchor === 'anchored' && <><dt>At PayPal</dt><dd><span className="verdict verdict-allow">Anchored</span> every order's <code>custom_id</code> carries this passkey's fingerprint</dd></>}
+        {r.anchor === 'not_anchored' && <><dt>At PayPal</dt><dd><span className="verdict verdict-pending">Not anchored</span> the orders do not carry this passkey's fingerprint</dd></>}
+        {r.payers?.map(p => (
+          <Fragment key={p.orderId}>
+            <dt>Payer</dt>
+            <dd>{p.status === 'linked' ? <><span className="verdict verdict-allow">Linked</span> this passkey signed order <code>{p.orderId}</code>, and PayPal reports payer <code>{p.payerId}</code></>
+              : p.status === 'signed' ? <><span className="verdict verdict-pending">Signed</span> order <code>{p.orderId}</code>, not yet approved in PayPal</>
+              : <><span className="verdict verdict-deny">Invalid</span> {p.reason}</>}</dd>
+          </Fragment>
+        ))}
       </dl>
       {chainBroken && <p className="faint">{reason}.</p>}
-      <p className="faint">A valid seal proves the receipt was not altered since this Mandat deployment signed it. A buyer signature proves the holder of that passkey approved this exact mandate; Mandat never holds the key. The authenticator reports that Touch ID, Face ID or a PIN was used, but without attestation that flag is its own claim. Neither proves on its own whose passkey it is (in this demo it is not tied to an account) or that what the receipt records is true: PayPal's records of the same order (custom_id, capture, tracking) back that up.</p>
+      <p className="faint">A valid seal proves the receipt was not altered since this Mandat deployment signed it. A buyer signature proves the holder of that passkey approved this exact mandate; Mandat never holds the key. The authenticator reports that Touch ID, Face ID or a PIN was used, but without attestation that flag is its own claim. Neither proves on its own whose passkey it is (it is not enrolled with an account); a key anchored at PayPal could not be swapped after the order, and a linked payer is who PayPal says approved an order that key signed. Nor does the receipt prove what the receipt records is true: PayPal's records of the same order (custom_id, capture, tracking) back that up.</p>
     </section>
   );
 }
