@@ -3,7 +3,7 @@ import { formatMoney, type LedgerEntry, type Mandate, type Money } from '@mandat
 import { db } from './db';
 
 export interface OverviewOrder {
-  at: string; item: string; minor: number; amount: string;
+  rowId: string; at: string; item: string; minor: number; amount: string;
   authorizedBy: 'Guard alone' | 'Buyer in PayPal' | 'Passkey and PayPal';
   mandate: 'Signed' | 'Unsigned'; status: 'Paid' | 'Awaiting approval';
   orderId: string; mandateHash: string; payer: string; dispute: string;
@@ -17,7 +17,17 @@ const ruleOf = (reason: string) =>
   : reason.startsWith('total') ? 'Total limit' : reason.startsWith('maximum') ? 'Number of purchases' : reason.startsWith('mandate') ? 'Validity dates' : 'Other';
 
 /** Atelier Voyage's view across every mandate, read from the sealed ledgers: orders placed by agents and what the guard refused. */
+let cached: { at: number; data: Overview } | undefined;
+const CACHE_MS = 15_000;
+
 export function merchantOverview(): Overview {
+  if (cached && Date.now() - cached.at < CACHE_MS) return cached.data;
+  const data = readOverview();
+  cached = { at: Date.now(), data };
+  return data;
+}
+
+function readOverview(): Overview {
   const rows = db().prepare('SELECT id, mandate, ledger FROM sessions ORDER BY created_at DESC LIMIT ?').all(SESSIONS) as { id: string; mandate: string; ledger: string }[];
   const disputes = new Map((db().prepare('SELECT order_id, response, simulated_outcome FROM disputes').all() as { order_id: string; response: string | null; simulated_outcome: string | null }[])
     .map(d => [d.order_id, d.simulated_outcome ? 'Won (simulated)' : d.response ? 'Evidence sent' : 'Open']));
@@ -49,7 +59,7 @@ export function merchantOverview(): Overview {
       const approvedByPasskey = ledger.some(x => x.type === 'approval.signed' && (x.data as { orderId?: string }).orderId === d.orderId);
       const paid = d.mode === 'direct' || captured?.status === 'COMPLETED';
       orders.push({
-        at: e.at, item: `${proposal.title} ×${proposal.quantity}`, minor: amount.minor, amount: formatMoney(amount),
+        rowId: `${row.id}:${e.seq}`, at: e.at, item: `${proposal.title} ×${proposal.quantity}`, minor: amount.minor, amount: formatMoney(amount),
         authorizedBy: d.mode === 'direct' ? 'Guard alone' : approvedByPasskey ? 'Passkey and PayPal' : 'Buyer in PayPal',
         mandate: signed ? 'Signed' : 'Unsigned', status: paid ? 'Paid' : 'Awaiting approval',
         orderId: d.orderId, mandateHash: hash, payer: captured?.payerId ?? '', dispute: disputes.get(d.orderId) ?? '',

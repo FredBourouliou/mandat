@@ -160,6 +160,23 @@ describe('passkey anchored at PayPal and linked to the payer', () => {
     expect(payerLinks(g.ledger.entries, HASH, expected)).toMatchObject([{ orderId: 'O1', status: 'linked', payerId: 'PAYER1' }]);
   });
 
+  it('does not link a payer from a capture that failed', async () => {
+    const { g, key } = signedRun();
+    await g.submit(proposal);
+    g.record('approval.signed', { orderId: 'O1', signature: key.assert(hashFor()) });
+    g.record('order.captured', { proposalId: 'p1', orderId: 'O1', status: 'DECLINED', payerId: 'PAYER1' });
+    expect(payerLinks(g.ledger.entries, HASH, expected)).toMatchObject([{ orderId: 'O1', status: 'signed' }]);
+  });
+
+  it('reports an order captured without the passkey, and one signed only after the capture', async () => {
+    const { g, key } = signedRun();
+    await g.submit(proposal);
+    await g.completeApproval('p1');
+    expect(payerLinks(g.ledger.entries, HASH, expected)).toEqual([{ orderId: 'O1', status: 'unsigned' }]);
+    g.record('approval.signed', { orderId: 'O1', signature: key.assert(hashFor()) });
+    expect(payerLinks(g.ledger.entries, HASH, expected)).toMatchObject([{ orderId: 'O1', status: 'invalid' }]);
+  });
+
   it('rejects an order approval signed by another key', async () => {
     const { g } = signedRun();
     await g.submit(proposal);

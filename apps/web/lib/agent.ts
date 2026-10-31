@@ -69,7 +69,8 @@ export function proposer(sessionId: string, runId: string) {
     logAgent(sessionId, runId, 'proposal', { sku, title: p.title, quantity, unitPrice: formatMoney(p.price), merchant: p.merchant, reason });
     const outcome = await guard.submit(proposal);
     saveLedger(sessionId, guard);
-    logAgent(sessionId, runId, 'guard', { ...outcome, sku, title: p.title, quantity, unitPrice: formatMoney(p.price), merchant: p.merchant });
+    const { approveUrl: _link, ...logged } = { approveUrl: undefined, ...outcome };
+    logAgent(sessionId, runId, 'guard', { ...logged, sku, title: p.title, quantity, unitPrice: formatMoney(p.price), merchant: p.merchant });
     if (outcome.status === 'paid' && outcome.captureId) {
       await ship(sessionId, guard, outcome.orderId, outcome.captureId).catch(e => logAgent(sessionId, runId, 'error', { message: `tracking: ${String(e)}` }));
     }

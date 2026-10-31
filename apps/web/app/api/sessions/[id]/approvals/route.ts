@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { verifyApproval, type MandateSignature } from '@mandat/guard';
 import { canAct } from '@/lib/access';
 import { SIGNER } from '@/lib/env';
-import { guardFor, saveLedger } from '@/lib/store';
+import { guardFor, railFor, saveLedger } from '@/lib/store';
 
 const Body = z.object({
   orderId: z.string().min(5).max(40),
@@ -27,6 +27,10 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   const approval = { orderId, signature: { ...mandateSig, ...assertion } };
   const r = verifyApproval(guard.ledger.entries, guard.hash, approval, SIGNER);
   if (!r.valid) return NextResponse.json({ error: `Passkey signature rejected: ${r.reason}.` }, { status: 400 });
+  // The order id alone lets anyone open PayPal's approval page, so the order must still be unapproved here:
+  // a payer who approved before the passkey signed can never be linked to it, and the capture stays closed.
+  const status = await railFor(id).getOrder(orderId).then(o => o.status as string, () => 'UNKNOWN');
+  if (status !== 'PAYER_ACTION_REQUIRED') return NextResponse.json({ error: 'This order was already approved in PayPal, before your passkey signed it. It will not be captured.' }, { status: 409 });
   if (!guard.ledger.entries.some(e => e.type === 'approval.signed' && (e.data as { orderId?: string }).orderId === orderId)) {
     guard.record('approval.signed', approval);
     saveLedger(id, guard);

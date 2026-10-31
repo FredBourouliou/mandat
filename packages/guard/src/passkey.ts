@@ -90,8 +90,8 @@ export function keyTag(publicKey: string): string {
 
 /**
  * What goes into each order's `custom_id` once a mandate is signed: the mandate hash and the key's
- * fingerprint. PayPal keeps it from the moment of the order, so the key cannot be swapped afterwards,
- * for example once a dispute has been opened.
+ * fingerprint. PayPal refuses to change it once the order is completed (422 ORDER_ALREADY_COMPLETED,
+ * tested on the sandbox), so the key cannot be swapped afterwards, for example once a dispute is open.
  */
 export function anchorFor(mandateHash: string, publicKey: string): string {
   return `${mandateHash}.${keyTag(publicKey)}`;
@@ -111,6 +111,7 @@ export interface ApprovalSignature { orderId: string; signature: MandateSignatur
 export type PayerLink =
   | { orderId: string; status: 'linked'; payerId: string; signedAt: string }
   | { orderId: string; status: 'signed'; signedAt: string }
+  | { orderId: string; status: 'unsigned' }
   | { orderId: string; status: 'invalid'; reason: string };
 
 /** The amount the guard decided for an order: the `decision` entry just before its `order.created`. */
@@ -137,13 +138,25 @@ export function verifyApproval(entries: LedgerEntry[], mandateHash: string, a: A
 
 /** Every signed order approval in a ledger, with the payer PayPal reported for it. */
 export function payerLinks(entries: LedgerEntry[], mandateHash: string, expected: ExpectedSigner = {}): PayerLink[] {
-  return entries.filter(e => e.type === 'approval.signed').map(e => {
+  if (!entries.some(e => e.type === 'mandate.signed')) return [];
+  const approvals = entries.filter(e => e.type === 'approval.signed');
+  const captures = entries.filter(e => e.type === 'order.captured' && (e.data as { status?: string }).status === 'COMPLETED');
+  const links: PayerLink[] = approvals.map(e => {
     const a = e.data as ApprovalSignature;
     const r = verifyApproval(entries, mandateHash, a, expected);
     if (!r.valid) return { orderId: a.orderId, status: 'invalid', reason: r.reason };
-    const payerId = entries.filter(x => x.type === 'order.captured').map(x => x.data as { orderId?: string; payerId?: string }).find(d => d.orderId === a.orderId)?.payerId;
+    const capture = captures.find(c => (c.data as { orderId?: string }).orderId === a.orderId);
+    if (!capture) return { orderId: a.orderId, status: 'signed', signedAt: e.at };
+    if (capture.seq < e.seq) return { orderId: a.orderId, status: 'invalid', reason: 'the order was captured before the passkey signed it' };
+    const payerId = (capture.data as { payerId?: string }).payerId;
     return payerId ? { orderId: a.orderId, status: 'linked', payerId, signedAt: e.at } : { orderId: a.orderId, status: 'signed', signedAt: e.at };
   });
+  // An order captured on a signed mandate without the passkey's signature must show, not stay silent.
+  for (const c of captures) {
+    const orderId = (c.data as { orderId: string }).orderId;
+    if (!links.some(l => l.orderId === orderId)) links.push({ orderId, status: 'unsigned' });
+  }
+  return links;
 }
 
 /** Whether every order of a signed mandate carries that key's fingerprint in its `custom_id`. */

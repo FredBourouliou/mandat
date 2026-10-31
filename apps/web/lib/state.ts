@@ -13,10 +13,11 @@ export function sessionState(id: string) {
   if (!row || !guard) return null;
   const mandate = JSON.parse(row.mandate) as Mandate;
   const buyer = buyerSignature(guard.ledger.entries, guard.hash, SIGNER);
+  const mandateSigned = guard.ledger.entries.some(e => e.type === 'mandate.signed');
   const signedOrders = new Set(guard.ledger.entries.filter(e => e.type === 'approval.signed').map(e => (e.data as { orderId: string }).orderId));
   // On a signed mandate the PayPal link appears only once the passkey has signed that exact order.
   const orders = guard.orders.map((o): (typeof guard.orders)[number] & { approvalChallenge?: string } => (
-    o.state === 'awaiting_approval' && buyer.status === 'signed' && !signedOrders.has(o.orderId)
+    o.state === 'awaiting_approval' && mandateSigned && !signedOrders.has(o.orderId)
       ? { ...o, approveUrl: undefined, approvalChallenge: mandateChallenge(approvalHash({ mandateHash: guard.hash, orderId: o.orderId, amount: o.amount })) }
       : o
   ));

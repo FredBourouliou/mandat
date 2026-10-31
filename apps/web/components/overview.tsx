@@ -72,7 +72,7 @@ export function MerchantOverview({ data }: { data: Overview }) {
         </div>
         <div className="grid-wrap" style={{ height: 520 }}>
           <AgGridReact<OverviewOrder> theme={gridTheme} rowData={data.orders} columnDefs={orderColumns} defaultColDef={{ ...defaults, floatingFilter: true }}
-            quickFilterText={q} getRowId={p => p.data.orderId || `pinned-${p.data.item}`} pinnedBottomRowData={pinned} pagination paginationPageSize={50} paginationPageSizeSelector={[50, 100, 200]}
+            quickFilterText={q} getRowId={p => p.data.rowId || `pinned-${p.data.item}`} pinnedBottomRowData={pinned} pagination paginationPageSize={50} paginationPageSizeSelector={[50, 100, 200]}
             onGridReady={e => { api.current = e.api; }} onFilterChanged={refresh} overlayNoRowsTemplate="No orders yet." />
         </div>
       </section>
