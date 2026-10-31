@@ -1,4 +1,5 @@
 import 'server-only';
+import { createHash } from 'node:crypto';
 import { formatMoney, type LedgerEntry, type Mandate, type Money } from '@mandat/guard';
 import { db } from './db';
 
@@ -59,7 +60,7 @@ function readOverview(): Overview {
       const approvedByPasskey = ledger.some(x => x.type === 'approval.signed' && (x.data as { orderId?: string }).orderId === d.orderId);
       const paid = d.mode === 'direct' || captured?.status === 'COMPLETED';
       orders.push({
-        rowId: `${row.id}:${e.seq}`, at: e.at, item: `${proposal.title} ×${proposal.quantity}`, minor: amount.minor, amount: formatMoney(amount),
+        rowId: createHash('sha256').update(`${row.id}:${e.seq}`).digest('base64url').slice(0, 16), at: e.at, item: `${proposal.title} ×${proposal.quantity}`, minor: amount.minor, amount: formatMoney(amount),
         authorizedBy: d.mode === 'direct' ? 'Guard alone' : approvedByPasskey ? 'Passkey and PayPal' : 'Buyer in PayPal',
         mandate: signed ? 'Signed' : 'Unsigned', status: paid ? 'Paid' : 'Awaiting approval',
         orderId: d.orderId, mandateHash: hash, payer: captured?.payerId ?? '', dispute: disputes.get(d.orderId) ?? '',
