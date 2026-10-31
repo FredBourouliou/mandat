@@ -1,11 +1,14 @@
 import Link from 'next/link';
 import { MerchantOverview } from '@/components/overview';
+import { hasLiveAccess } from '@/lib/access';
 import { merchantOverview } from '@/lib/overview';
 
 export const dynamic = 'force-dynamic';
 
-export default function MerchantBackOffice() {
-  const data = merchantOverview();
+export default async function MerchantBackOffice() {
+  const all = merchantOverview();
+  // Public visitors see the aggregate; payer and order ids, sandbox as they are, stay with access-code holders.
+  const data = (await hasLiveAccess()) ? all : { ...all, orders: all.orders.map(o => ({ ...o, orderId: `${o.orderId.slice(0, 8)}…`, payer: o.payer && 'hidden' })) };
   return (
     <div className="stack">
       <header className="stack">
