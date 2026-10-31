@@ -4,7 +4,7 @@ import { db } from './db';
 
 export interface OverviewOrder {
   at: string; item: string; minor: number; amount: string;
-  authorizedBy: 'Guard, within the mandate' | 'Buyer in PayPal' | 'Passkey and PayPal';
+  authorizedBy: 'Guard alone' | 'Buyer in PayPal' | 'Passkey and PayPal';
   mandate: 'Signed' | 'Unsigned'; status: 'Paid' | 'Awaiting approval';
   orderId: string; mandateHash: string; payer: string; dispute: string;
 }
@@ -50,7 +50,7 @@ export function merchantOverview(): Overview {
       const paid = d.mode === 'direct' || captured?.status === 'COMPLETED';
       orders.push({
         at: e.at, item: `${proposal.title} ×${proposal.quantity}`, minor: amount.minor, amount: formatMoney(amount),
-        authorizedBy: d.mode === 'direct' ? 'Guard, within the mandate' : approvedByPasskey ? 'Passkey and PayPal' : 'Buyer in PayPal',
+        authorizedBy: d.mode === 'direct' ? 'Guard alone' : approvedByPasskey ? 'Passkey and PayPal' : 'Buyer in PayPal',
         mandate: signed ? 'Signed' : 'Unsigned', status: paid ? 'Paid' : 'Awaiting approval',
         orderId: d.orderId, mandateHash: hash, payer: captured?.payerId ?? '', dispute: disputes.get(d.orderId) ?? '',
       });

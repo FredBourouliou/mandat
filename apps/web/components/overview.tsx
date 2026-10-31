@@ -10,7 +10,7 @@ const eur = (minor: number) => `${(minor / 100).toFixed(2)} EUR`;
 const when = (at?: string) => (at ? `${at.slice(0, 10)} ${time(at)}` : '');
 const Verdict = ({ kind, label }: { kind: string; label: string }) => <span className={`verdict verdict-${kind}`}>{label}</span>;
 const defaults = { sortable: true, resizable: true, suppressMovable: true, filter: true };
-const authKind: Record<string, string> = { 'Passkey and PayPal': 'allow', 'Buyer in PayPal': 'pending', 'Guard, within the mandate': 'neutral' };
+const authKind: Record<string, string> = { 'Passkey and PayPal': 'allow', 'Buyer in PayPal': 'pending', 'Guard alone': 'neutral' };
 
 /** The rows left after the filters: the totals follow what the merchant is looking at. */
 function totals(api: GridApi<OverviewOrder>) {
@@ -33,9 +33,9 @@ export function MerchantOverview({ data }: { data: Overview }) {
 
   const orderColumns = useMemo<ColDef<OverviewOrder>[]>(() => [
     { field: 'at', headerName: 'Date', width: 150, sort: 'desc', filter: 'agTextColumnFilter', valueFormatter: p => when(p.value) },
-    { field: 'item', headerName: 'Item', flex: 1, minWidth: 210 },
+    { field: 'item', headerName: 'Item', flex: 1, minWidth: 290 },
     { field: 'minor', headerName: 'Amount', width: 120, filter: 'agNumberColumnFilter', filterValueGetter: p => (p.data?.minor ?? 0) / 100, valueFormatter: p => eur(p.value), cellClass: 'num' },
-    { field: 'authorizedBy', headerName: 'Authorized by', width: 210, cellRenderer: (p: ICellRendererParams<OverviewOrder>) => p.value ? <Verdict kind={authKind[p.value] ?? 'neutral'} label={p.value} /> : null },
+    { field: 'authorizedBy', headerName: 'Authorized by', width: 190, cellRenderer: (p: ICellRendererParams<OverviewOrder>) => p.value ? <Verdict kind={authKind[p.value] ?? 'neutral'} label={p.value} /> : null },
     { field: 'mandate', headerName: 'Mandate', width: 112 },
     { field: 'status', headerName: 'Status', width: 150 },
     { field: 'dispute', headerName: 'Dispute', width: 160, valueFormatter: p => (p.node?.isRowPinned() ? '' : p.value || '—') },
@@ -46,10 +46,10 @@ export function MerchantOverview({ data }: { data: Overview }) {
 
   const blockedColumns = useMemo<ColDef<OverviewBlocked>[]>(() => [
     { field: 'at', headerName: 'Date', width: 150, sort: 'desc', filter: 'agTextColumnFilter', valueFormatter: p => when(p.value) },
-    { field: 'item', headerName: 'Proposal', flex: 1, minWidth: 220 },
+    { field: 'item', headerName: 'Proposal', flex: 1, minWidth: 320 },
     { field: 'minor', headerName: 'Amount', width: 130, filter: 'agNumberColumnFilter', filterValueGetter: p => (p.data?.minor ?? 0) / 100, valueFormatter: p => eur(p.value), cellClass: 'num' },
     { field: 'sellers', headerName: 'Seller', width: 170 },
-    { field: 'rule', headerName: 'Rules broken', width: 230 },
+    { field: 'rule', headerName: 'Rules broken', width: 340 },
     { field: 'reasons', headerName: 'Guard\'s reasons', flex: 2, minWidth: 320, tooltipField: 'reasons', cellClass: 'faint-cell' },
   ], []);
 
@@ -60,7 +60,8 @@ export function MerchantOverview({ data }: { data: Overview }) {
       <section className="deed" aria-labelledby="orders-title">
         <h2 id="orders-title" className="h-sub">Orders placed by agents</h2>
         <dl className="terms" aria-live="polite">
-          <dt>Paid</dt><dd>{eur(shown.paid)} in {shown.count} orders shown</dd>
+          <dt>Orders shown</dt><dd>{shown.count}</dd>
+          <dt>Paid</dt><dd>{eur(shown.paid)}</dd>
           <dt>Under dispute</dt><dd>{eur(shown.disputed)}</dd>
         </dl>
         <div className="btn-row">
