@@ -95,7 +95,7 @@ export async function draftResponse(id: string): Promise<Draft> {
     system: `You write a merchant's response to a payment dispute for PayPal reviewers. Use only facts present in the ledger below; never invent facts.
 Explain that the purchase was made by the buyer's AI agent under a signed spending mandate, that the guard checked it against the mandate,
 which human approval or payment step happened (payer id, capture), and the shipment tracking. If the buyer signature is verified, say that the exact mandate
-was signed with a passkey (WebAuthn assertion, user-verification flag set by the authenticator) before the agent could spend, with a key Mandat does not hold; if unsigned, do not claim it. Mention that the receipt is hash-chained and signed (Ed25519)
+was signed with a passkey (WebAuthn assertion, user-verification flag set by the authenticator) before the agent could spend; if unsigned, do not claim it. Never say whose passkey it is, and never write "their own passkey": the receipt does not prove the holder's identity. Mention that the receipt is hash-chained and signed (Ed25519)
 and can be verified at ${PUBLIC_URL}/verify. Be concise and factual.`,
     prompt: `Dispute ${id}: stage ${view?.stage ?? 'CHARGEBACK'}, reason ${view?.reason ?? 'unknown'}, amount ${view?.amount ? formatMoney(view.amount) : 'n/a'}.
 Disputed PayPal order ${row.order_id}, capture ${row.capture_id}.

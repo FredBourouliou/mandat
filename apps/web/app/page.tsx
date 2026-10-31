@@ -13,7 +13,7 @@ function DemoChoice() {
       <p className="muted">No code needed. A complete run, recorded on the PayPal sandbox:</p>
       <ol className="steps">
         <li>The agent buys within the mandate.</li>
-        <li>A prompt injection hidden in a listing is blocked.</li>
+        <li>A tent outside the mandate is refused; the instruction hidden in its listing changes nothing.</li>
         <li>A human approves a purchase in PayPal.</li>
         <li>A chargeback is answered with the sealed receipt.</li>
       </ol>

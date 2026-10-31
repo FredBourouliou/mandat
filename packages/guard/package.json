@@ -8,6 +8,7 @@
   },
   "scripts": {
     "test": "vitest run",
+    "mutation": "node scripts/mutation-check.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

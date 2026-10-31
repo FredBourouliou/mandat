@@ -4,10 +4,10 @@
 
 Mandat lets an AI shopping agent buy on PayPal under a spending mandate you sign once. The agent (Claude) proposes purchases. A deterministic guard checks each one against the mandate and pays through PayPal. You approve anything above your threshold. Every step is hash-chained and signed into a receipt, so if the payment is disputed, the merchant can show exactly who authorized what.
 
-![On a mandate signed with the buyer's passkey, the agent proposes a tent from a partner listing that hides a prompt injection; the guard blocks it for three reasons](docs/demo.gif)
+![On a mandate signed with the buyer's passkey, asked for a tent from a partner listing that hides a prompt injection, the agent proposes one; the guard refuses it for three reasons](docs/demo.gif)
 
 - **Live demo:** https://mandat-zrgh.onrender.com (open the recorded run without a code; live runs need the judges' access code)
-- **Video (2 min):** _link added at submission_
+- **Video (2 min 38):** _link added at submission_
 - PayPal **sandbox** only. No real money moves.
 
 ## Why
@@ -45,12 +45,12 @@ flowchart LR
 
 | Real, on the PayPal sandbox | Simulated, and labelled as such |
 | --- | --- |
-| Orders, card captures, buyer approvals, captures after approval | The final ruling of a chargeback. The sandbox cannot adjudicate chargebacks (`ACTION_NOT_ALLOWED_IN_CURRENT_DISPUTE_STATE`), so the demo stops at "evidence sent, under review" and the "won" outcome is a labelled simulation. |
-| Tracking attached to orders | The cardholder's chargeback itself is created with PayPal's sandbox-only `process-chargeback` endpoint. |
-| Chargebacks, dispute webhooks (signature verified), evidence upload (`provide-supporting-info` / `provide-evidence`) | |
+| Orders, card captures, buyer approvals, captures after approval | The final ruling of a chargeback. The sandbox cannot adjudicate chargebacks (`ACTION_NOT_ALLOWED_IN_CURRENT_DISPUTE_STATE`), so the demo stops at "evidence sent" and the "won" outcome is a labelled simulation. |
+| Tracking attached to orders | The cardholder's chargeback itself is created with PayPal's sandbox-only `process-chargeback` endpoint, with the reason "not as described". A receipt shows who authorized a purchase, not the state of the goods. |
+| Chargebacks, dispute webhooks (signature verified), evidence upload (`provide-supporting-info` / `provide-evidence`) | Purchases under the threshold are paid with a PayPal sandbox test card held by the server. The code refuses it outside the sandbox: a real deployment needs a payment method saved with the buyer's consent, which is not built yet. |
 | Claude agent runs and dispute drafts | |
 
-A valid seal proves the receipt was not altered after Mandat signed it. A valid buyer signature proves that the holder of that passkey approved this exact mandate with user verification, and that Mandat could not have produced it. The user-verification flag (Touch ID, Face ID or a PIN) is reported by the authenticator; without attestation it is that authenticator's own claim, and a scripted software key could set it too. Neither proves on its own whose passkey it is: in this demo the passkey is not tied to an account (synced passkeys carry no attestation). Neither proves that the facts are true: PayPal's records of the same order (custom_id, capture, payer, tracking) back them up.
+A valid seal proves the receipt was not altered after Mandat signed it. A valid buyer signature proves that the holder of that passkey approved this exact mandate with user verification. Mandat never holds the buyer's key, but the public key arrives with the signature instead of being enrolled beforehand, so a dishonest server could generate a key and sign for itself: tying the key to the buyer is future work. The user-verification flag (Touch ID, Face ID or a PIN) is reported by the authenticator; without attestation it is that authenticator's own claim, and a scripted software key could set it too. Neither proves on its own whose passkey it is: in this demo the passkey is not tied to an account (synced passkeys carry no attestation). Neither proves that the facts are true: PayPal's records of the same order (custom_id, capture, payer, tracking) back them up.
 
 ## Quick start
 
@@ -87,8 +87,8 @@ claude mcp add mandat -e MANDAT_SESSION=<run id> -e MANDAT_ACCESS_CODE=<code> --
 
 ## Tests and evidence
 
-- `pnpm test`: 44 tests on the guard, in about 0.3 s. They cover 12 out-of-mandate cases, approval, idempotency, the cumulative limit (also with concurrent proposals), restoring the guard from its ledger, receipts that must fail verification when one byte changes, an entry is removed, or another key is used, and the buyer's passkey signature (ES256 and Ed25519 from a software authenticator; rejected when it signs another mandate, lacks user verification or presence, comes from another relying party, origin or key, or when the issued mandate was swapped).
-- Property-based tests (fast-check): for any mandate and any sequence of up to 12 proposals a hijacked agent could make (any merchant, category, currency, price or quantity, including zero, negative and fractional values), sequential or concurrent, no order outside the mandate reaches PayPal; a proposal never creates two orders; the guard rebuilt from its ledger has the same state; and any change to any sealed entry is rejected. Checked by mutation: disabling any one of ten guard rules (each limit, currency, merchant, dates, quantity, serialization, idempotency) makes these properties fail.
+- `pnpm test`: 48 tests on the guard, in about 0.3 s. They cover 12 out-of-mandate cases, approval, idempotency, the cumulative limit (also with concurrent proposals), restoring the guard from its ledger, receipts that must fail verification when one byte changes, an entry is removed, or another key is used, and the buyer's passkey signature (ES256 and Ed25519 from a software authenticator; rejected when it signs another mandate, lacks user verification or presence, comes from another relying party, origin or key, or when the issued mandate was swapped).
+- Property-based tests (fast-check): for any mandate and any sequence of up to 12 proposals a hijacked agent could make (any merchant, category, currency, price or quantity, including zero, negative and fractional values), sequential or concurrent, no order outside the mandate reaches PayPal; a proposal never creates two orders; the guard rebuilt from its ledger has the same state; and any change to any sealed entry is rejected. Checked by mutation: `pnpm --filter @mandat/guard mutation` disables each of 13 guard rules in turn (each limit, currency, merchant, category, dates, quantity, price, approval threshold, serialization, idempotency) and asserts that the tests then fail.
 - The passkey flow was also run in Chromium with a virtual WebAuthn authenticator: first use (create then sign), reuse of the same passkey, the unsigned path, a signature replayed on another mandate (rejected) and a mandate edited inside a signed receipt (rejected twice: chain and buyer signature).
 - `packages/guard/scripts/*.ts`: end-to-end runs against the real PayPal sandbox (direct payment, idempotent re-submission, approval then capture, tracking, PDF).
 - `scripts/injection-suite.ts`: 30 attacks in five families (direct requests, false authority, manipulated proposals, instructions hidden in listings, budget exhaustion), each on a fresh mandate, run with three agent personas, and checked independently of what the agent says. **Results: [docs/injection-results.md](docs/injection-results.md)** (raw data in `docs/injection-results.json`).
